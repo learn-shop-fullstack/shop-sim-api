@@ -22,3 +22,56 @@
 - 테이블마다 소유 모듈이 하나다. 아래 다이어그램은 소유 모듈별로 나눈다
 - 다른 모듈의 테이블은 읽지 않는다(CLAUDE.md "모듈 경계"). 대신 **모듈 간 외래 키는 둔다**: 조회는 공개 인터페이스로 하되, 참조 무결성은 DB가 지킨다
 - 다른 레포가 소유하는 데이터(shop-sim-vendor의 운송장·모의 PG 거래, shop-sim-loadtest의 시뮬레이션)는 커머스 DB에 두지 않는다. 커머스 DB에는 외부 식별자(운송장 번호, PG 거래 ID)만 저장한다
+
+## 관계도
+
+`||--o{` 1:N, `|o--o{` 0..1:N(부모가 없을 수 있음), `||--o|` 1:0..1, `||--||` 1:1. 다른 모듈의 테이블은 관계를 보여 주기 위해 함께 그린다.
+
+### 회원·판매자 (user, auth, seller, admin)
+
+```mermaid
+erDiagram
+    users ||--o{ addresses : "배송지"
+    users ||--o| sellers : "판매자 프로필"
+    users ||--o{ seller_applications : "입점 신청"
+    sellers ||--|| shipping_policies : "기본 배송 정책"
+```
+
+- **미정: Better Auth POC(#17) 후 확정** — `users`와 인증 테이블(세션, 소셜 계정)은 Better Auth가 정의한다. 운영자 계정을 `users`와 분리할지(입점 심사자 참조 포함)도 POC 결론을 따른다
+- 입점 신청은 거절 후 재신청할 수 있어 `users` 1:N. 승인되면 `sellers`가 만들어진다
+
+### 카탈로그 (catalog)
+
+```mermaid
+erDiagram
+    categories |o--o{ categories : "상위 카테고리"
+    categories ||--o{ products : ""
+    sellers ||--o{ products : "판매"
+    products ||--o{ product_images : ""
+    products ||--o{ product_revisions : "상세 본문 이력"
+    products ||--o{ product_options : "선택형 옵션"
+    product_options ||--o{ option_values : ""
+    products ||--o{ skus : "옵션 조합"
+    skus ||--o{ sku_option_values : ""
+    option_values ||--o{ sku_option_values : ""
+    products ||--o{ custom_option_fields : "자유 입력형 옵션"
+```
+
+- `sku_option_values`는 SKU 하나가 어떤 옵션 값 조합인지 기록하는 연결 테이블이다(SKU ↔ 옵션 값 N:M). 옵션이 없는 상품도 SKU 1개를 가진다
+
+### 재고 (inventory)
+
+```mermaid
+erDiagram
+    sellers ||--o{ raw_materials : "원재료"
+    products ||--o{ bill_of_materials : "제작상품 소요량"
+    raw_materials ||--o{ bill_of_materials : ""
+    skus |o--o{ stock_lots : "완제품 로트"
+    raw_materials |o--o{ stock_lots : "원재료 로트"
+    stock_lots ||--o{ stock_ledger_entries : "변동 원장"
+    stock_lots ||--o{ stock_reservations : "예약"
+```
+
+- `stock_lots`는 완제품(SKU) 또는 원재료 중 정확히 하나를 가리킨다(`CHECK`로 강제)
+- 재고 수량의 원본은 원장(`stock_ledger_entries`)이고, `stock_lots.quantity`는 원장 합계를 캐시한 값이다
+- 예약은 로트 단위다. 유효기한이 가까운 로트부터 예약한다(FEFO). 주문 항목과의 관계는 주문 관계도에서 그린다
