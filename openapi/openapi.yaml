@@ -1,0 +1,41 @@
+openapi: 3.1.1
+info:
+  title: shop-sim API
+  version: 0.0.0
+  description: 스펙 우선 툴체인 POC (#2) — 엔드포인트 1개
+paths:
+  /products/{productId}:
+    get:
+      operationId: getProduct
+      tags: [products]
+      summary: 상품 단건 조회
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 상품
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+components:
+  schemas:
+    Product:
+      type: object
+      required: [id, name, price]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+        price:
+          type: integer
+          minimum: 0
+          description: 원 단위
