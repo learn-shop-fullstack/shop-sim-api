@@ -1,0 +1,20 @@
+{
+  "name": "shop-sim-api",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Drizzle POC (#3) — main에 머지하지 않는다",
+  "type": "module",
+  "scripts": {
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "drizzle-orm": "0.45.4",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/pg": "8.23.1",
+    "drizzle-kit": "0.31.11"
+  }
+}
