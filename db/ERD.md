@@ -189,6 +189,37 @@ Better Auth가 읽고 쓰는 테이블이다. TS 키는 Better Auth 필드 이�
 - 회원 탈퇴는 `users` 행을 지우지 않는다(주문·리뷰가 참조). 개인정보 컬럼을 익명화하고 세션·계정 행을 지운다. 절차는 2단계에서 정한다
 - Better Auth를 업그레이드하거나 플러그인을 더하면 `@better-auth/cli generate`로 만든 기준 스키마와 비교해 빠진 필드를 추가한다
 
+### 회원 2: 배송지, 판매자, 입점 신청, 배송 정책
+
+**`addresses`**: `user_id`(FK), `recipient_name`, `phone`, `zip_code`, `address1`, `address2`, `is_default`(boolean). 기본 배송지는 사용자당 하나: UNIQUE (`user_id`) `WHERE is_default`
+
+**`sellers`**
+| 컬럼 | 타입 | 제약 | 설명 |
+|---|---|---|---|
+| `user_id` | uuid | NOT NULL, UNIQUE, FK `users` | 1계정 1스토어 |
+| `store_name` | text | NOT NULL, UNIQUE | |
+| `description` | text | | |
+| `brand_image_key` | text | | R2 객체 키 |
+| `status` | `seller_status` | NOT NULL DEFAULT `ACTIVE` | `ACTIVE` / `SUSPENDED`(운영 제재) |
+
+**`seller_applications`**
+| 컬럼 | 타입 | 제약 | 설명 |
+|---|---|---|---|
+| `user_id` | uuid | NOT NULL, FK `users` | |
+| `store_name` | text | NOT NULL | 승인되면 `sellers`로 복사 |
+| `business_name`, `business_number`, `representative_name` | text | NOT NULL | 상호, 사업자등록번호, 대표자 |
+| `bank_code` | text | NOT NULL | |
+| `account_number_encrypted` | bytea | NOT NULL | 정산 계좌. 앱에서 암호화해 저장 |
+| `account_number_last4` | text | NOT NULL | 화면 표시용(`****1234`) |
+| `status` | `seller_application_status` | NOT NULL DEFAULT `SUBMITTED` | `SUBMITTED` / `APPROVED` / `REJECTED` |
+| `reviewed_by` | uuid | FK `admin_users`, 심사 전 NULL | |
+| `reviewed_at` | timestamptz | | |
+| `reject_reason` | text | `REJECTED`면 NOT NULL (CHECK) | |
+
+심사 대기 신청은 사용자당 하나: UNIQUE (`user_id`) `WHERE status = 'SUBMITTED'`. 심사 큐 조회용 인덱스 (`status`, `created_at`)
+
+**`shipping_policies`**: `seller_id`(NOT NULL, UNIQUE, FK), `base_fee`(integer, ≥ 0), `free_shipping_threshold`(integer, NULL이면 무료배송 없음), 출고지 `zip_code`, `address1`, `address2`
+
 ### 카탈로그 1: 카테고리, 상품, 이미지, 본문 이력
 
 **`categories`**
