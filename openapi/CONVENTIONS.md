@@ -1,6 +1,10 @@
 # OpenAPI 스펙 규약
 
-`openapi/`의 모든 스펙에 적용한다. 툴체인은 ADR 0012. **[린트]** 표시는 `redocly lint`가 강제하는 규칙이다.
+`openapi/`의 모든 스펙에 적용한다. 툴체인은 ADR 0012. **[린트]** 표시는 `redocly lint`가 강제하는 규칙이다(설정: 레포 루트 `redocly.yaml`).
+
+```sh
+pnpm --package=@redocly/cli@2.71.1 dlx redocly lint openapi/openapi.yaml
+```
 
 ## 버전
 

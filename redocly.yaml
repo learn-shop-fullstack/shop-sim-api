@@ -1,0 +1,36 @@
+# openapi/CONVENTIONS.md의 [린트] 규칙. nullable 금지는 recommended의 struct 규칙이 잡는다.
+extends:
+  - recommended
+
+rules:
+  # 인증 방식이 미결정이다. 4단계(인증)에서 켠다
+  security-defined: off
+  # 외부에 공개하는 API가 아니다
+  info-license: off
+
+  paths-kebab-case: error
+  path-segment-plural: error
+  no-required-schema-properties-undefined: error
+
+  rule/operation-id-camel-case:
+    subject: { type: Operation, property: operationId }
+    assertions: { casing: camelCase }
+  rule/parameter-camel-case:
+    subject: { type: Parameter, property: name }
+    assertions: { casing: camelCase }
+  rule/property-camel-case:
+    subject: { type: SchemaProperties }
+    assertions: { casing: camelCase }
+  rule/schema-name-pascal-case:
+    subject: { type: NamedSchemas }
+    assertions: { casing: PascalCase }
+  rule/enum-macro-case:
+    subject: { type: Schema, property: enum }
+    assertions: { casing: MACRO_CASE }
+  # contains는 type: object와 type: [object, 'null'] 둘 다 잡는다
+  rule/object-additional-properties-false:
+    subject: { type: Schema, property: additionalProperties }
+    assertions: { defined: true, const: false }
+    where:
+      - subject: { type: Schema, property: type }
+        assertions: { contains: [object] }
