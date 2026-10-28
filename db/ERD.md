@@ -31,13 +31,18 @@
 
 ```mermaid
 erDiagram
+    users ||--o{ sessions : ""
+    users ||--o{ accounts : "로그인 수단(비밀번호·소셜)"
     users ||--o{ addresses : "배송지"
     users ||--o| sellers : "판매자 프로필"
     users ||--o{ seller_applications : "입점 신청"
+    admin_users ||--o{ admin_sessions : ""
+    admin_users ||--o{ admin_accounts : ""
+    admin_users |o--o{ seller_applications : "심사"
     sellers ||--|| shipping_policies : "기본 배송 정책"
 ```
 
-- **미정: Better Auth POC(#17) 후 확정** — `users`와 인증 테이블(세션, 소셜 계정)은 Better Auth가 정의한다. 운영자 계정을 `users`와 분리할지(입점 심사자 참조 포함)도 POC 결론을 따른다
+- 인증 테이블은 Better Auth가 쓴다(ADR 0015). 운영자는 별도 인스턴스라 `admin_*` 테이블이 같은 구조로 따로 있다. `verifications`(이메일 인증·비밀번호 재설정 토큰)는 관계가 없어 생략
 - 입점 신청은 거절 후 재신청할 수 있어 `users` 1:N. 승인되면 `sellers`가 만들어진다
 
 ### 카탈로그 (catalog)
@@ -166,7 +171,54 @@ erDiagram
 
 ## 컬럼 (1~3단계)
 
-공통 규칙의 `id`, `created_at`, `updated_at`은 생략한다. 회원·인증 테이블(2단계)은 Better Auth POC(#17) 후에 쓴다.
+공통 규칙의 `id`, `created_at`, `updated_at`은 생략한다.
+
+### 회원 1: 인증 (Better Auth, ADR 0015)
+
+Better Auth가 읽고 쓰는 테이블이다. TS 키는 Better Auth 필드 이름과 같아야 하고, 컬럼 이름·타입·제약은 공통 규칙을 따른다. 정의 원본은 `poc/better-auth` 브랜치의 `src/db/auth-schema.ts`(접두사 `''` / `'admin_'`로 두 벌 생성). 운영자 쪽 `admin_*`는 구조가 같아 생략한다.
+
+| 테이블 | 컬럼 | 제약 |
+|---|---|---|
+| `users` | `name`, `email`, `email_verified`(boolean), `image`, **`is_test_account`**(boolean, NOT NULL DEFAULT false) | `users_email_key` UNIQUE |
+| `sessions` | `user_id`, `token`, `expires_at`, `ip_address`, `user_agent` | `token` UNIQUE, `user_id` FK `ON DELETE CASCADE` |
+| `accounts` | `user_id`, `provider_id`(`credential` / `google` / `kakao` / `naver`), `account_id`, 토큰·만료 컬럼, `password`(해시, `credential`만) | UNIQUE (`provider_id`, `account_id`), `user_id` FK `ON DELETE CASCADE` |
+| `verifications` | `identifier`, `value`, `expires_at` | 인덱스 `identifier` |
+
+- `is_test_account`는 Better Auth의 `user.additionalFields`로 등록하고 `input: false`로 둔다(가입 요청으로 설정할 수 없게). 시뮬레이터 봇 계정만 서버에서 켠다
+- 세션·계정의 `CASCADE`는 공통 규칙의 예외다. 사용자에게 완전히 딸린 행이다
+- 회원 탈퇴는 `users` 행을 지우지 않는다(주문·리뷰가 참조). 개인정보 컬럼을 익명화하고 세션·계정 행을 지운다. 절차는 2단계에서 정한다
+- Better Auth를 업그레이드하거나 플러그인을 더하면 `@better-auth/cli generate`로 만든 기준 스키마와 비교해 빠진 필드를 추가한다
+
+### 회원 2: 배송지, 판매자, 입점 신청, 배송 정책
+
+**`addresses`**: `user_id`(FK), `recipient_name`, `phone`, `zip_code`, `address1`, `address2`, `is_default`(boolean). 기본 배송지는 사용자당 하나: UNIQUE (`user_id`) `WHERE is_default`
+
+**`sellers`**
+| 컬럼 | 타입 | 제약 | 설명 |
+|---|---|---|---|
+| `user_id` | uuid | NOT NULL, UNIQUE, FK `users` | 1계정 1스토어 |
+| `store_name` | text | NOT NULL, UNIQUE | |
+| `description` | text | | |
+| `brand_image_key` | text | | R2 객체 키 |
+| `status` | `seller_status` | NOT NULL DEFAULT `ACTIVE` | `ACTIVE` / `SUSPENDED`(운영 제재) |
+
+**`seller_applications`**
+| 컬럼 | 타입 | 제약 | 설명 |
+|---|---|---|---|
+| `user_id` | uuid | NOT NULL, FK `users` | |
+| `store_name` | text | NOT NULL | 승인되면 `sellers`로 복사 |
+| `business_name`, `business_number`, `representative_name` | text | NOT NULL | 상호, 사업자등록번호, 대표자 |
+| `bank_code` | text | NOT NULL | |
+| `account_number_encrypted` | bytea | NOT NULL | 정산 계좌. 앱에서 암호화해 저장 |
+| `account_number_last4` | text | NOT NULL | 화면 표시용(`****1234`) |
+| `status` | `seller_application_status` | NOT NULL DEFAULT `SUBMITTED` | `SUBMITTED` / `APPROVED` / `REJECTED` |
+| `reviewed_by` | uuid | FK `admin_users`, 심사 전 NULL | |
+| `reviewed_at` | timestamptz | | |
+| `reject_reason` | text | `REJECTED`면 NOT NULL (CHECK) | |
+
+심사 대기 신청은 사용자당 하나: UNIQUE (`user_id`) `WHERE status = 'SUBMITTED'`. 심사 큐 조회용 인덱스 (`status`, `created_at`)
+
+**`shipping_policies`**: `seller_id`(NOT NULL, UNIQUE, FK), `base_fee`(integer, ≥ 0), `free_shipping_threshold`(integer, NULL이면 무료배송 없음), 출고지 `zip_code`, `address1`, `address2`
 
 ### 카탈로그 1: 카테고리, 상품, 이미지, 본문 이력
 
