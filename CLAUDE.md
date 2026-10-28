@@ -59,6 +59,7 @@ scripts/
 | 계약 | OpenAPI 3.1 + AsyncAPI 스펙 우선, semver 패키지 배포 | 0003, 0012 |
 | 이벤트 | Kafka + 아웃박스, 재시도 토픽 + DLT, 지연 처리는 DB 스윕 | 0004 |
 | ORM | Drizzle + drizzle-kit (0.45 안정판, 1.0 정식 출시 시 업그레이드 경로 확인) | 0005 |
+| 인증 | Better Auth, DB 세션(JWT 안 씀), 운영자는 별도 인스턴스 | 0015 |
 | 검색 | OpenSearch + Nori, Kafka 이벤트로 색인 | 0006 |
 | 도메인 | 멀티 판매자, 한 계정이 구매자 겸 판매자 | 0007 |
 | LLM | 제공자 독립 `LlmClient` 포트 | 0008 |
@@ -85,6 +86,13 @@ scripts/
   - 커밋 값은 다음에 읽을 오프셋(`offset + 1`). 오프셋은 64비트 문자열이라 `BigInt`로 계산한다
   - SIGTERM에서 `disconnect()`로 그룹을 떠난다. 강제 종료되면 세션 타임아웃까지 리밸런스가 늦어져 그 파티션 처리가 멈춘다
 
+### 인증 (ADR 0015, POC #17)
+- Better Auth 핸들러는 Nest 밖 Express에 직접 건다: `bodyParser: false` → `/api/auth/*splat`·`/api/admin/auth/*splat` 핸들러 → `express.json()` → 검증기 → Nest 라우트. 세션 조회는 가드에서 `auth.api.getSession({ headers: fromNodeHeaders(req.headers) })`
+- 인증 경로는 스펙 우선의 예외다. OpenAPI에 넣지 않고 검증기 `ignorePaths`로 뺀다. 이 예외를 다른 경로로 넓히지 않는다
+- core 테이블은 Drizzle로 직접 정의한다(`db/ERD.md` "회원 1"). TS 키는 Better Auth 필드 이름과 같게, `generateId: false`로 id는 DB `uuidv7()`. 업그레이드·플러그인 추가 시 `@better-auth/cli generate` 결과와 비교한다
+- 서버만 쓰는 필드(`isTestAccount` 등)는 `additionalFields`에 `input: false`
+- 운영자 인스턴스는 가입을 막고 비밀값을 따로 둔다. 운영자 쿠키는 상위 도메인에 걸지 않는다
+
 ### 결제
 - 승인 전 서버에 저장한 주문 금액과 결제 요청 금액을 비교한다
 - 봇 계정(`isTestAccount`)은 모의 PG, 사람은 토스페이먼츠 테스트 모드
@@ -96,8 +104,8 @@ scripts/
 
 - [ ] AsyncAPI 호환성 검사 도구
 - [ ] 채팅 게이트웨이: Socket.IO vs ws
-- [ ] 인증 방식 (세션 vs JWT), 스토어·셀러센터·어드민 도메인 구성에 따른 CORS/쿠키 정책
+- [ ] `p-stack.dev` 하위 도메인 구성에 따른 CORS·쿠키 도메인·신뢰 출처 (인증 방식은 ADR 0015로 결정)
 
 ## 현재 단계
 
-0단계: 주요 결정·스펙 툴체인(ADR 0012)·스펙 규약(ADR 0013)·Drizzle·Kafka POC 완료 → ERD 초안, 이벤트 계약 방식, 토스페이먼츠 테스트 키 발급 → 1단계(뼈대 배포).
+0단계: 주요 결정·스펙 툴체인(ADR 0012)·스펙 규약(ADR 0013)·Drizzle·Kafka·Better Auth POC(ADR 0015)·ERD 초안(`db/ERD.md`) 완료 → 이벤트 계약 방식, 토스페이먼츠 테스트 키 발급 → 1단계(뼈대 배포).

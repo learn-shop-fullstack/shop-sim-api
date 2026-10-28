@@ -3,7 +3,7 @@ extends:
   - recommended
 
 rules:
-  # 인증 방식이 미결정이다. 4단계(인증)에서 켠다
+  # 인증 구현(2단계, ADR 0015)에서 켠다
   security-defined: off
   # 외부에 공개하는 API가 아니다
   info-license: off
