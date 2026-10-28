@@ -198,3 +198,29 @@ erDiagram
 **`product_images`**: `product_id`(FK, `ON DELETE CASCADE`), `original_key`(text, R2 객체 키), `resize_status`(`PENDING` / `DONE` / `FAILED`), `sort_order`(integer, 0번이 대표). 인덱스 (`product_id`, `sort_order`)
 
 **`product_revisions`**: `product_id`(FK), `revision`(integer, UNIQUE (`product_id`, `revision`)), `detail_content`(jsonb), `created_by`(FK `users`). 본문을 저장할 때마다 1행. `products.detail_content`는 마지막 리비전과 같다
+
+### 카탈로그 2: 옵션, SKU, 자유 입력형 옵션
+
+**`product_options`**: `product_id`(FK), `name`(text, UNIQUE (`product_id`, `name`)), `sort_order`. 예: "색상", "크기"
+
+**`option_values`**: `option_id`(FK `product_options`), `value`(text, UNIQUE (`option_id`, `value`)), `sort_order`. 아래 복합 외래 키의 대상이 되도록 UNIQUE (`id`, `option_id`)도 둔다
+
+**`skus`**
+| 컬럼 | 타입 | 제약 | 설명 |
+|---|---|---|---|
+| `product_id` | uuid | NOT NULL, FK `products` | |
+| `code` | text | UNIQUE (`product_id`, `code`) | 판매자 관리 코드(선택) |
+| `option_key` | text | NOT NULL, UNIQUE (`product_id`, `option_key`) | 옵션 값 ID를 정렬해 이은 문자열. 옵션 없는 상품은 `''`. 같은 조합의 SKU 중복을 막는다 |
+| `extra_price` | integer | NOT NULL DEFAULT 0, ≥ 0 | 옵션 추가금 |
+| `status` | `sku_status` | NOT NULL DEFAULT `ACTIVE` | `ACTIVE` / `INACTIVE`(판매 중지). 품절은 재고로 판단하고 상태로 두지 않는다 |
+
+**`sku_option_values`** (연결 테이블, `id` 없음)
+| 컬럼 | 타입 | 제약 |
+|---|---|---|
+| `sku_id` | uuid | FK `skus` `ON DELETE CASCADE`, PK (`sku_id`, `option_id`) |
+| `option_id` | uuid | NOT NULL |
+| `option_value_id` | uuid | NOT NULL, FK (`option_value_id`, `option_id`) → `option_values` (`id`, `option_id`) |
+
+PK가 (`sku_id`, `option_id`)라 SKU 하나가 같은 옵션("색상")의 값을 두 개 가질 수 없고, 복합 외래 키가 "값이 그 옵션에 속한다"를 보장한다
+
+**`custom_option_fields`**: `product_id`(FK), `label`(text), `input_type`(`TEXT` / `LONG_TEXT`), `required`(boolean), `max_length`(integer, > 0), `sort_order`. 구매자가 입력한 값은 `order_items`에 스냅샷(jsonb)으로 저장한다
