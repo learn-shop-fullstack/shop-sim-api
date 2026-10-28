@@ -1,0 +1,13 @@
+{
+  "name": "shop-sim-api",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Kafka POC (#4) — main에 머지하지 않는다",
+  "type": "module",
+  "dependencies": {
+    "@confluentinc/kafka-javascript": "1.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2"
+  }
+}
