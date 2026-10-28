@@ -1,4 +1,5 @@
-import { Body, Controller, Module, Post } from '@nestjs/common';
+import { Body, Controller, Get, Module, Post, Req, UseGuards } from '@nestjs/common';
+import { AuthGuard, type AuthSession } from './auth.guard';
 
 @Controller('echo')
 class EchoController {
@@ -9,5 +10,14 @@ class EchoController {
   }
 }
 
-@Module({ controllers: [EchoController] })
+@Controller('me')
+@UseGuards(AuthGuard)
+class MeController {
+  @Get()
+  me(@Req() req: { authSession: AuthSession }) {
+    return { userId: req.authSession.user.id, email: req.authSession.user.email };
+  }
+}
+
+@Module({ controllers: [EchoController, MeController] })
 export class AppModule {}
