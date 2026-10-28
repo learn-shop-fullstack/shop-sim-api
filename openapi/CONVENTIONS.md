@@ -35,3 +35,44 @@
   - `allOf`로 스키마를 합치면 `additionalProperties: false`가 합친 결과를 깨뜨린다. 그때는 `unevaluatedProperties: false`를 쓰고 두 도구가 처리하는지 확인한다
 - `required`에 적은 필드는 `properties`에 정의한다. Hey API는 정의 없는 required를 경고 없이 무시한다 **[린트]**
 - 요청·응답 본문 스키마는 `components/schemas`에 이름을 붙여 둔다. 생성 타입 이름이 된다
+
+## 에러 응답 (RFC 9457 Problem Details)
+
+- 모든 4xx·5xx 본문은 `application/problem+json`, 스키마 `Problem`이다. 공통 응답은 `components/responses`에 두고 `$ref`로 쓴다
+- 클라이언트는 **`type`으로만 분기**한다. `title`·`detail`은 화면 표시용이다
+
+| 필드 | 값 |
+|---|---|
+| `type` | 일반 HTTP 오류는 `about:blank`. 클라이언트가 구분해야 하는 오류는 `/problems/<kebab-case>` |
+| `title` | 같은 `type`이면 항상 같은 짧은 요약. `about:blank`면 HTTP 상태 문구 |
+| `status` | HTTP 상태 코드와 같은 값 |
+| `detail` | 이번 발생에 대한 설명. 5xx에는 넣지 않는다 |
+| `instance` | 요청 경로 |
+| `errors` | 검증 오류일 때만. `[{ pointer, detail }]`, `pointer`는 `#/body/name`, `#/query/pageSize`, `#/path/productId`처럼 위치를 접두어로 둔 JSON Pointer |
+
+상태 코드: 400 요청이 스펙과 다름, 401 인증 없음, 403 권한 없음, 404 리소스 없음, 409 현재 상태와 충돌(재고 부족, 중복, 허용되지 않은 상태 전이). 422는 쓰지 않는다. 5xx는 스펙에 적지 않는다.
+
+### 오류 종류 목록
+
+`/problems/*` type은 계약이다. 이름을 바꾸거나 지우면 BREAKING이다. 새 type은 이 표에 먼저 추가한다.
+
+| type | status | 의미 |
+|---|---|---|
+| `/problems/validation-error` | 400 | 요청이 스펙과 다름. `errors`에 위치별 원인 |
+| `/problems/invalid-page-token` | 400 | `pageToken`이 잘못됐거나, 발급 때와 다른 조건(필터·정렬)으로 쓰임 |
+
+## 페이지네이션 (Google AIP-158)
+
+목록 operation(`listXxx`)은 모두 커서 방식을 쓴다. 행 번호로 이동하고 전체 개수를 보여야 하는 그리드 목록(셀러센터·어드민의 AG Grid)만 오프셋을 함께 연다.
+
+| 방식 | 쿼리 | 응답 200 | 쓰는 곳 |
+|---|---|---|---|
+| 커서 (기본) | `pageSize`(integer, 1~100, 기본 20), `pageToken`(string, 선택) | `{ items, nextPageToken }` | 모든 목록 |
+| + 오프셋 | 위에 더해 `skip`(integer, 0~10000, 기본 0) | 위에 더해 `totalSize`(integer) | 그리드 목록만 |
+
+- `items`, `nextPageToken`(`string | null`)은 required다. 마지막 페이지면 `nextPageToken: null`
+- `pageToken`은 서버가 만든 불투명한 문자열이다. 클라이언트는 받은 값을 그대로 돌려보내기만 한다
+- 서버는 토큰에 발급 조건(필터·정렬)을 담고, 다른 조건으로 쓰이면 `/problems/invalid-page-token`으로 거절한다
+- `skip`은 결과 앞에서부터 건너뛸 개수다. 그리드는 `pageToken` 없이 `skip`만 쓴다. AG Grid Infinite Row Model에서는 `skip = startRow`, `pageSize = endRow - startRow`, `lastRow = totalSize`
+- `skip` 상한 10000: 오프셋은 뒤로 갈수록 DB가 앞 행을 세고 버려 느려진다
+- 그리드 목록의 `totalSize`는 required다. `COUNT` 비용이 들어 그리드 목록에만 둔다
