@@ -1,7 +1,8 @@
-import { Controller, Get, NotFoundException, Param } from '@nestjs/common';
+import { Controller, Get, NotFoundException, Param, UseInterceptors } from '@nestjs/common';
 import type { ProductsControllerMethods } from './generated/openapi/nestjs.gen';
 import type { GetProductData, Product } from './generated/openapi/types.gen';
-import { zGetProductPath } from './generated/openapi/zod.gen';
+import { zGetProductPath, zGetProductResponse } from './generated/openapi/zod.gen';
+import { ZodResponseInterceptor } from './zod-response.interceptor';
 import { ZodValidationPipe } from './zod-validation.pipe';
 
 const PRODUCTS: Product[] = [
@@ -11,6 +12,7 @@ const PRODUCTS: Product[] = [
 @Controller('products')
 export class ProductsController implements Pick<ProductsControllerMethods, 'getProduct'> {
   @Get(':productId')
+  @UseInterceptors(new ZodResponseInterceptor(zGetProductResponse))
   async getProduct(@Param(new ZodValidationPipe(zGetProductPath)) path: GetProductData['path']) {
     const product = PRODUCTS.find((p) => p.id === path.productId);
     if (!product) throw new NotFoundException();
