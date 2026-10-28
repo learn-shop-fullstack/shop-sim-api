@@ -57,7 +57,7 @@ scripts/
 |---|---|---|
 | 프레임워크 | NestJS 12, 모듈러 모놀리스 | 0002, 0012 |
 | 계약 | OpenAPI 3.1 + AsyncAPI 스펙 우선, semver 패키지 배포 | 0003, 0012 |
-| 이벤트 | Kafka + 아웃박스, 재시도 토픽 + DLT, 지연 처리는 DB 스윕 | 0004 |
+| 이벤트 | Kafka + 아웃박스, 재시도 토픽 + DLT, 지연 처리는 DB 스윕. 봉투는 CloudEvents 1.0 binary 모드 | 0004, 0016 |
 | ORM | Drizzle + drizzle-kit (0.45 안정판, 1.0 정식 출시 시 업그레이드 경로 확인) | 0005 |
 | 인증 | Better Auth, DB 세션(JWT 안 씀), 운영자는 별도 인스턴스 | 0015 |
 | 검색 | OpenSearch + Nori, Kafka 이벤트로 색인 | 0006 |
@@ -75,6 +75,12 @@ scripts/
 - 응답 스키마의 초과 필드는 `additionalProperties: false`가 있어야 잡힌다 → 규약은 #6
 - **문서**: YAML 스펙을 Swagger UI 또는 Scalar로 그대로 서빙
 - 쓰지 않는 것: DTO 클래스 + class-validator로 스키마 이중 정의, `@nestjs/swagger` 코드 우선 생성
+
+### 이벤트 계약 (ADR 0016, POC #7)
+- `asyncapi/` 메시지를 추가·변경하거나 이벤트를 발행·소비하는 코드를 쓸 때는 `asyncapi/CONVENTIONS.md`를 따른다(이름, CloudEvents 헤더, 호환성 판정표, BREAKING 절차)
+- 호환성은 "생산자 닫힘 + 컨슈머 관대"로 양방향 판정한다. 필수 필드 추가·타입 넓힘·필수→선택도 BREAKING이다. BREAKING이면 기존 메시지를 고치지 않고 `V2` 메시지를 같은 채널에 추가한다
+- 페이로드 호환성은 `asyncapi diff`가 판정하지 못한다(전부 `unclassified`로 통과). 호환성 스크립트로만 판정한다
+- `ce_id`는 아웃박스 행 ID를 쓴다. 발행마다 새로 만들면 컨슈머 멱등 처리가 깨진다
 
 ### Kafka
 - 클라이언트: `@confluentinc/kafka-javascript`를 Nest 모듈로 직접 감싼다 (연결 수명주기, 그레이스풀 셧다운, 오프셋 수동 커밋)
@@ -102,10 +108,9 @@ scripts/
 
 ## 미결정
 
-- [ ] AsyncAPI 호환성 검사 도구
 - [ ] 채팅 게이트웨이: Socket.IO vs ws
 - [ ] `p-stack.dev` 하위 도메인 구성에 따른 CORS·쿠키 도메인·신뢰 출처 (인증 방식은 ADR 0015로 결정)
 
 ## 현재 단계
 
-0단계: 주요 결정·스펙 툴체인(ADR 0012)·스펙 규약(ADR 0013)·Drizzle·Kafka·Better Auth POC(ADR 0015)·ERD 초안(`db/ERD.md`) 완료 → 이벤트 계약 방식, 토스페이먼츠 테스트 키 발급 → 1단계(뼈대 배포).
+0단계: 주요 결정·스펙 툴체인(ADR 0012)·스펙 규약(ADR 0013)·Drizzle·Kafka·Better Auth POC(ADR 0015)·ERD 초안(`db/ERD.md`)·이벤트 계약 규약(`asyncapi/CONVENTIONS.md`) 완료 → 토스페이먼츠 테스트 키 발급 → 1단계(뼈대 배포).
