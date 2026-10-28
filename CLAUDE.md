@@ -77,8 +77,13 @@ scripts/
 
 ### Kafka
 - 클라이언트: `@confluentinc/kafka-javascript`를 Nest 모듈로 직접 감싼다 (연결 수명주기, 그레이스풀 셧다운, 오프셋 수동 커밋)
+  - librdkafka 네이티브 바이너리를 설치 스크립트가 받는다 → `pnpm-workspace.yaml`의 `allowBuilds`에 이 패키지만 허용. 배포 이미지의 Node 메이저·libc가 릴리스의 사전 빌드 목록에 있어야 한다 (POC #4)
 - 토픽: `product.events`, `order.events`, `payment.events`, `shipment.events` 등. 키는 집계 ID(`productId`, `orderId`)
+  - 자동 생성에 맡기지 않고 파티션 수를 정해 명시적으로 만든다
 - 컨슈머는 그룹별 `processed_messages`로 멱등 처리, 처리 완료 후 오프셋 커밋
+  - 커밋 전에 죽으면 커밋 위치부터 다시 받는다(at-least-once). 멱등 처리는 선택이 아니다
+  - 커밋 값은 다음에 읽을 오프셋(`offset + 1`). 오프셋은 64비트 문자열이라 `BigInt`로 계산한다
+  - SIGTERM에서 `disconnect()`로 그룹을 떠난다. 강제 종료되면 세션 타임아웃까지 리밸런스가 늦어져 그 파티션 처리가 멈춘다
 
 ### 결제
 - 승인 전 서버에 저장한 주문 금액과 결제 요청 금액을 비교한다
@@ -95,4 +100,4 @@ scripts/
 
 ## 현재 단계
 
-0단계: 주요 결정·스펙 툴체인(ADR 0012)·스펙 규약(ADR 0013)·Drizzle POC 완료 → Kafka POC, ERD 초안, 토스페이먼츠 테스트 키 발급 → 1단계(뼈대 배포).
+0단계: 주요 결정·스펙 툴체인(ADR 0012)·스펙 규약(ADR 0013)·Drizzle·Kafka POC 완료 → ERD 초안, 이벤트 계약 방식, 토스페이먼츠 테스트 키 발급 → 1단계(뼈대 배포).
