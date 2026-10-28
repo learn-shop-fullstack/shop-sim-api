@@ -18,7 +18,24 @@ paths:
                 properties:
                   userId: { type: string, format: uuid }
                   email: { type: string, format: email }
-        '401': { description: 세션 없음 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /admin/me:
+    get:
+      operationId: getAdminMe
+      summary: 로그인한 운영자
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [adminId, email]
+                properties:
+                  adminId: { type: string, format: uuid }
+                  email: { type: string, format: email }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /echo:
     post:
       operationId: echo
@@ -30,3 +47,10 @@ paths:
             schema: { type: object }
       responses:
         '201': { description: OK }
+components:
+  responses:
+    Unauthorized:
+      description: 세션 없음 (POC는 Problem Details 필터가 없어 Nest 기본 형식)
+      content:
+        application/json:
+          schema: { type: object }

@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Module, Post, Req, UseGuards } from '@nestjs/common';
-import { AuthGuard, type AuthSession } from './auth.guard';
+import { AdminGuard, AuthGuard, type AdminSession, type AuthSession } from './auth.guard';
 
 @Controller('echo')
 class EchoController {
@@ -19,5 +19,14 @@ class MeController {
   }
 }
 
-@Module({ controllers: [EchoController, MeController] })
+@Controller('admin/me')
+@UseGuards(AdminGuard)
+class AdminMeController {
+  @Get()
+  me(@Req() req: { adminSession: AdminSession }) {
+    return { adminId: req.adminSession.user.id, email: req.adminSession.user.email };
+  }
+}
+
+@Module({ controllers: [EchoController, MeController, AdminMeController] })
 export class AppModule {}

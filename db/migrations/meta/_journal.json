@@ -8,6 +8,13 @@
       "when": 1793192265177,
       "tag": "0000_melted_angel",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793192612098,
+      "tag": "0001_lethal_wallop",
+      "breakpoints": true
     }
   ]
 }
