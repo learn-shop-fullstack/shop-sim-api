@@ -5,7 +5,8 @@
   "description": "스펙 우선 툴체인 POC (#2) — main에 머지하지 않는다",
   "type": "commonjs",
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js"
   },
   "dependencies": {
     "@nestjs/common": "12.2.0",
