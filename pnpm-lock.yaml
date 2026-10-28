@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@nest-openapi/validator':
+        specifier: 0.1.2
+        version: 0.1.2(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.2.0)(reflect-metadata@0.2.2)
       '@nestjs/common':
         specifier: 12.2.0
         version: 12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -17,6 +20,9 @@ importers:
       '@nestjs/platform-express':
         specifier: 12.2.0
         version: 12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.2.0)
+      ajv-formats:
+        specifier: 3.0.1
+        version: 3.0.1
       express-openapi-validator:
         specifier: 5.6.2
         version: 5.6.2(@types/json-schema@7.0.15)(express@5.3.0)
@@ -26,6 +32,9 @@ importers:
       rxjs:
         specifier: 7.8.2
         version: 7.8.2
+      yaml:
+        specifier: 2.9.1
+        version: 2.9.1
     devDependencies:
       '@hey-api/openapi-ts':
         specifier: 0.99.0
@@ -86,6 +95,22 @@ packages:
   '@lukeed/ms@2.0.2':
     resolution: {integrity: sha512-9I2Zn6+NJLfaGoz9jN3lpwDgAYvfGeNYdbAIjJOqzs4Tpc+VU3Jqq4IofSUBKajiDS8k9fZIg18/z13mpk1bsA==}
     engines: {node: '>=8'}
+
+  '@nest-openapi/runtime@0.1.2':
+    resolution: {integrity: sha512-R2eReGXCo7q1+7orSt9hZRaWauJNO7f7OG1+Wb/K2qjE7VCabscFznZJGwLc+O+mBBrNraaNgEtpCEiRhFJpqg==}
+    peerDependencies:
+      '@nestjs/common': ^9.0.0 || ^10.0.0 || ^11.0.0
+
+  '@nest-openapi/validator@0.1.2':
+    resolution: {integrity: sha512-EROpY21WGdGVG/Xan1/YQdfXxEZmardedyh9/qxRgEHgXlscaeuH/eqdZKjeUpoYJtDBsRvvjXEO3H0MrLWE0g==}
+    peerDependencies:
+      '@nestjs/common': ^9.0.0 || ^10.0.0 || ^11.0.0
+      '@nestjs/core': ^9.0.0 || ^10.0.0 || ^11.0.0
+      ajv: ^8.0.0
+      reflect-metadata: ^0.2.2
+    peerDependenciesMeta:
+      ajv:
+        optional: true
 
   '@nestjs/common@12.2.0':
     resolution: {integrity: sha512-xC4tUL31tQ2eoZcHheHIjnCrhnqyAEDRMGGHMUrYsOdh0Kg1DvDlLn7zelisErMcpaNanSIApJH6m9AcnK3fQQ==}
@@ -727,6 +752,11 @@ packages:
     resolution: {integrity: sha512-g/eziiSUNBSsdDJtCLB8bdYEUMj4jR7AGeUo96p/3dTafgjHhpF4RiCFPiRILwjQoDXx5MqkBr4fwWtR3Ky4Wg==}
     engines: {node: '>=20'}
 
+  yaml@2.9.1:
+    resolution: {integrity: sha512-3NxN8+78OdzbT7C/WjGsyfPAtJaN3FNDsWxv7Y7mcDsT/oOmgW8BpyQQFFBnvZE3j9Y2Sdz1ULFLezL7Eb2yFw==}
+    engines: {node: '>= 14.6'}
+    hasBin: true
+
 snapshots:
 
   '@apidevtools/json-schema-ref-parser@14.2.1(@types/json-schema@7.0.15)':
@@ -791,6 +821,19 @@ snapshots:
   '@lukeed/csprng@1.1.0': {}
 
   '@lukeed/ms@2.0.2': {}
+
+  '@nest-openapi/runtime@0.1.2(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))':
+    dependencies:
+      '@nestjs/common': 12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
+
+  '@nest-openapi/validator@0.1.2(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.2.0)(reflect-metadata@0.2.2)':
+    dependencies:
+      '@nest-openapi/runtime': 0.1.2(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))
+      '@nestjs/common': 12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core': 12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@12.2.0)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      ajv: 8.20.0
+      reflect-metadata: 0.2.2
+      rxjs: 7.8.2
 
   '@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)':
     dependencies:
@@ -1451,3 +1494,5 @@ snapshots:
     dependencies:
       is-wsl: 3.1.1
       powershell-utils: 0.1.0
+
+  yaml@2.9.1: {}
