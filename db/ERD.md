@@ -163,3 +163,38 @@ erDiagram
 | `notices`, `faqs` | support | 작성자(운영자) 참조는 #17 후 확정 |
 
 **다른 레포 소유 데이터 점검**: 운송장 상세·이력(`Tracking`·`TrackingLog`), 모의 PG 거래는 shop-sim-vendor, `SimulationScenario`·`SimulationRun`은 shop-sim-loadtest에 있다. 커머스 DB에는 외부 식별자만 둔다(`shipments.tracking_number`, `payments.pg_transaction_id`).
+
+## 컬럼 (1~3단계)
+
+공통 규칙의 `id`, `created_at`, `updated_at`은 생략한다. 회원·인증 테이블(2단계)은 Better Auth POC(#17) 후에 쓴다.
+
+### 카탈로그 1: 카테고리, 상품, 이미지, 본문 이력
+
+**`categories`**
+| 컬럼 | 타입 | 제약 | 설명 |
+|---|---|---|---|
+| `parent_id` | uuid | FK `categories`, NULL이면 최상위 | 인접 리스트. 하위 트리는 재귀 CTE로 조회 |
+| `name` | text | NOT NULL, UNIQUE (`parent_id`, `name`) NULLS NOT DISTINCT | 같은 부모 아래 이름 중복 금지(최상위끼리도) |
+| `sort_order` | integer | NOT NULL DEFAULT 0 | 같은 부모 안 표시 순서 |
+
+**`products`**
+| 컬럼 | 타입 | 제약 | 설명 |
+|---|---|---|---|
+| `seller_id` | uuid | NOT NULL, FK `sellers` | |
+| `category_id` | uuid | NOT NULL, FK `categories` | 말단 카테고리만(앱에서 검사) |
+| `name`, `subtitle` | text | `name` NOT NULL | |
+| `type` | `product_type` | NOT NULL | `FINISHED` / `MADE_TO_ORDER` |
+| `price` | integer | NOT NULL, ≥ 0 | 정가(원). SKU 추가금은 `skus.extra_price` |
+| `discount_rate` | integer | NOT NULL DEFAULT 0, 0~99 | 할인율(%). 판매가 끝수 처리는 3단계 상품 API에서 정한다 |
+| `detail_content` | jsonb | NOT NULL | 현재 상세 본문(Tiptap JSON) |
+| `lead_time_days` | integer | `MADE_TO_ORDER`면 NOT NULL (CHECK) | 제작 소요일 |
+| `status` | `product_status` | NOT NULL DEFAULT `DRAFT` | `DRAFT` / `PUBLISHED` / `SCHEDULED` / `SUSPENDED` |
+| `scheduled_at` | timestamptz | `SCHEDULED`면 NOT NULL (CHECK) | 예약 발행 시각 |
+| `published_at` | timestamptz | | 처음 공개된 시각 |
+| `version` | integer | NOT NULL DEFAULT 1 | 낙관적 락 |
+
+인덱스: (`seller_id`, `status`) 셀러센터 목록, (`scheduled_at`) `WHERE status = 'SCHEDULED'` 예약 발행 스윕
+
+**`product_images`**: `product_id`(FK, `ON DELETE CASCADE`), `original_key`(text, R2 객체 키), `resize_status`(`PENDING` / `DONE` / `FAILED`), `sort_order`(integer, 0번이 대표). 인덱스 (`product_id`, `sort_order`)
+
+**`product_revisions`**: `product_id`(FK), `revision`(integer, UNIQUE (`product_id`, `revision`)), `detail_content`(jsonb), `created_by`(FK `users`). 본문을 저장할 때마다 1행. `products.detail_content`는 마지막 리비전과 같다
