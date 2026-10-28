@@ -1,0 +1,11 @@
+{
+  "name": "shop-sim-api",
+  "version": "0.0.0",
+  "private": true,
+  "description": "이벤트 계약 POC (#7) — main에 머지하지 않는다",
+  "type": "module",
+  "devDependencies": {
+    "json-schema-diff": "1.0.0",
+    "yaml": "2.9.1"
+  }
+}
