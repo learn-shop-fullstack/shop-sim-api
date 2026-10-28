@@ -1,0 +1,25 @@
+{
+  "name": "shop-sim-api",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Better Auth POC (#17) — main에 머지하지 않는다",
+  "type": "commonjs",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@nestjs/common": "12.3.2",
+    "@nestjs/core": "12.3.2",
+    "@nestjs/platform-express": "12.3.2",
+    "better-auth": "1.7.14",
+    "express": "5.3.0",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2"
+  },
+  "devDependencies": {
+    "@types/express": "5.0.6",
+    "@types/node": "24.19.2",
+    "typescript": "6.0.3"
+  }
+}
