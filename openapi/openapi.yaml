@@ -1,0 +1,32 @@
+openapi: 3.1.1
+info: { title: shop-sim-api (Better Auth POC), version: 0.0.0 }
+servers: [{ url: / }]
+paths:
+  /me:
+    get:
+      operationId: getMe
+      summary: 로그인한 사용자
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [userId, email]
+                properties:
+                  userId: { type: string, format: uuid }
+                  email: { type: string, format: email }
+        '401': { description: 세션 없음 }
+  /echo:
+    post:
+      operationId: echo
+      summary: JSON 파서 확인
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '201': { description: OK }
