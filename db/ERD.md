@@ -25,7 +25,7 @@
 
 ## 관계도
 
-`||--o{` 1:N, `|o--o{` 0..1:N(부모가 없을 수 있음), `||--o|` 1:0..1, `||--||` 1:1. 다른 모듈의 테이블은 관계를 보여 주기 위해 함께 그린다.
+`||--o{` 1:N, `||--|{` 1:1..N, `|o--o{` 0..1:N(부모가 없을 수 있음), `||--o|` 1:0..1, `||--||` 1:1. 다른 모듈의 테이블은 관계를 보여 주기 위해 함께 그린다.
 
 ### 회원·판매자 (user, auth, seller, admin)
 
@@ -75,3 +75,37 @@ erDiagram
 - `stock_lots`는 완제품(SKU) 또는 원재료 중 정확히 하나를 가리킨다(`CHECK`로 강제)
 - 재고 수량의 원본은 원장(`stock_ledger_entries`)이고, `stock_lots.quantity`는 원장 합계를 캐시한 값이다
 - 예약은 로트 단위다. 유효기한이 가까운 로트부터 예약한다(FEFO). 주문 항목과의 관계는 주문 관계도에서 그린다
+
+### 주문·결제·배송·쿠폰 (order, payment, coupon, shipment)
+
+```mermaid
+erDiagram
+    users ||--o| carts : ""
+    carts ||--o{ cart_items : ""
+    skus ||--o{ cart_items : ""
+    users ||--o{ checkouts : "주문서(결제 단위)"
+    checkouts ||--|{ orders : "판매자별 주문"
+    sellers ||--o{ orders : ""
+    orders ||--|{ order_items : ""
+    skus ||--o{ order_items : ""
+    order_items ||--o{ stock_reservations : "재고 예약"
+    checkouts ||--o{ payments : "결제 시도"
+    payments ||--o{ refunds : ""
+    orders ||--o{ order_issues : "취소·반품 요청"
+    order_issues ||--|{ order_issue_items : ""
+    order_items ||--o{ order_issue_items : ""
+    order_issues |o--o{ refunds : ""
+    orders ||--o| shipments : "배송"
+    sellers |o--o{ coupons : "발행(없으면 플랫폼)"
+    coupons ||--o{ coupon_issues : "발급"
+    users ||--o{ coupon_issues : ""
+    coupon_issues ||--o| coupon_redemptions : "사용"
+    checkouts ||--o{ coupon_redemptions : ""
+```
+
+- 결제는 주문서(`checkouts`) 단위로 한 번, 배송은 판매자별 주문(`orders`) 단위다. 여러 판매자 상품을 한 번에 결제하면 주문서 1개에 주문 N개
+- `payments`는 주문서당 여러 행일 수 있다(실패 후 재시도). 승인된 결제는 주문서당 최대 1개(부분 유니크 인덱스)
+- 주문 항목은 가격·할인·옵션 입력값을, 주문은 배송지를 **스냅샷**으로 복사한다. 상품·배송지가 나중에 바뀌어도 주문은 그대로다
+- 쿠폰 사용은 주문서에 기록하고, 할인액은 주문 항목별로 나눠 스냅샷에 적는다(부분 취소·정산 계산용)
+- 환불은 결제에 묶인다. 판매자 취소처럼 요청 없이 생기는 환불도 있어 `order_issues`와의 관계는 0..1
+- 운송장 상세·상태 이력은 shop-sim-vendor가 소유한다. `shipments`에는 택배사, 운송장 번호, 마지막으로 동기화한 상태만 둔다
