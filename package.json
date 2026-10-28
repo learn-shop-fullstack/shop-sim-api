@@ -4,6 +4,11 @@
   "private": true,
   "description": "이벤트 계약 POC (#7) — main에 머지하지 않는다",
   "type": "module",
+  "dependencies": {
+    "@confluentinc/kafka-javascript": "1.11.0",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1"
+  },
   "devDependencies": {
     "json-schema-diff": "1.0.0",
     "yaml": "2.9.1"
