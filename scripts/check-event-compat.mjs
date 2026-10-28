@@ -43,6 +43,40 @@ const open = (node) => {
   );
 };
 
+// json-schema-diff가 판정하지 않는 키워드(KEYWORDS.md "no")와 draft-07 밖 키워드.
+// 값이 바뀌면 자동 판정 없이 실패시킨다. enum은 값 추가만 호환(컨슈머는 모르는 값을 기본 처리)
+const UNSUPPORTED = ['enum', 'const', 'format', 'pattern', 'multipleOf', 'uniqueItems', 'contains',
+  'additionalItems', 'patternProperties', 'dependencies', 'propertyNames', 'if', 'then', 'else',
+  'unevaluatedProperties', 'unevaluatedItems', 'prefixItems', 'dependentRequired', 'dependentSchemas'];
+const NAME_MAPS = ['properties', 'patternProperties', 'dependencies', 'dependentSchemas', '$defs', 'definitions'];
+const VALUES = ['enum', 'const', 'default', 'examples'];
+
+// 스키마 노드 경로(JSON Pointer)와 키워드 경로 → 값. 이름 맵 아래 키는 필드 이름이라 키워드로 보지 않는다
+function keywords(schema, path = '', out = { nodes: new Set(), values: new Map() }) {
+  if (schema === null || typeof schema !== 'object') return out;
+  out.nodes.add(path);
+  for (const [k, v] of Object.entries(schema)) {
+    if (UNSUPPORTED.includes(k)) out.values.set(`${path}/${k}`, v);
+    if (VALUES.includes(k) || v === null || typeof v !== 'object') continue;
+    if (NAME_MAPS.includes(k)) for (const [n, s] of Object.entries(v)) keywords(s, `${path}/${k}/${n}`, out);
+    else if (Array.isArray(v)) v.forEach((s, i) => keywords(s, `${path}/${k}/${i}`, out));
+    else keywords(v, `${path}/${k}`, out);
+  }
+  return out;
+}
+
+function unverified(oldSchema, newSchema) {
+  const [before, after] = [keywords(oldSchema), keywords(newSchema)];
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const enumAdded = (a, b) => Array.isArray(a) && Array.isArray(b) && a.every((x) => b.some((y) => same(x, y)));
+  // 노드가 통째로 생기거나 없어진 것은 json-schema-diff가 판정한다 → 양쪽에 있는 노드의 키워드만 본다
+  const inBoth = (p) => before.nodes.has(p.slice(0, p.lastIndexOf('/'))) && after.nodes.has(p.slice(0, p.lastIndexOf('/')));
+  return [...new Set([...before.values.keys(), ...after.values.keys()])].filter((p) => {
+    const [a, b] = [before.values.get(p), after.values.get(p)];
+    return inBoth(p) && !same(a, b) && !(p.endsWith('/enum') && enumAdded(a, b));
+  });
+}
+
 const base = payloads(basePath);
 const head = payloads(headPath);
 let breaking = false;
@@ -64,6 +98,10 @@ for (const [name, oldSchema] of Object.entries(base)) {
       console.log(`BREAKING ${name}: ${label}. 거부되는 값: ${JSON.stringify(result.removedJsonSchema)}`);
       breaking = true;
     }
+  }
+  for (const path of unverified(oldSchema, newSchema)) {
+    console.log(`BREAKING ${name}: 자동 판정하지 못하는 변경, 수동 검토 필요 ${path}`);
+    breaking = true;
   }
 }
 for (const name of Object.keys(head)) if (!(name in base)) console.log(`추가 ${name}`);
