@@ -1,0 +1,64 @@
+asyncapi: 3.1.0
+info:
+  title: shop-sim 커머스 이벤트 (POC #7)
+  version: 0.1.0
+defaultContentType: application/json
+
+channels:
+  orderEvents:
+    address: order.events
+    bindings:
+      kafka: { partitions: 3, replicas: 1, bindingVersion: '0.5.0' }
+    messages:
+      orderPaid:
+        $ref: '#/components/messages/OrderPaid'
+
+operations:
+  publishOrderEvents:
+    action: send
+    channel: { $ref: '#/channels/orderEvents' }
+    messages:
+      - $ref: '#/channels/orderEvents/messages/orderPaid'
+
+components:
+  messages:
+    OrderPaid:
+      name: OrderPaid
+      summary: 주문서 결제가 승인됐다
+      traits: [{ $ref: '#/components/messageTraits/CloudEvent' }]
+      headers:
+        type: object
+        properties:
+          ce_type: { const: order.paid.v1 }
+      bindings:
+        kafka:
+          key: { type: string, format: uuid, description: orderId }
+          bindingVersion: '0.5.0'
+      payload: { $ref: '#/components/schemas/OrderPaidV1' }
+
+  messageTraits:
+    # CloudEvents 1.0 Kafka 프로토콜 바인딩, binary 모드: 속성은 ce_ 헤더, 값은 data
+    CloudEvent:
+      headers:
+        type: object
+        required: [ce_specversion, ce_id, ce_source, ce_type, ce_time, content-type]
+        properties:
+          ce_specversion: { const: '1.0' }
+          ce_id: { type: string, format: uuid, description: 이벤트 ID. 컨슈머 멱등 처리 키 }
+          ce_source: { type: string, description: 발행 모듈 (예 /shop-sim-api/order) }
+          ce_type: { type: string, description: <집계>.<사건>.v<메이저> }
+          ce_time: { type: string, format: date-time }
+          ce_subject: { type: string, description: 집계 ID }
+          content-type: { const: application/json }
+
+  schemas:
+    OrderPaidV1:
+      type: object
+      additionalProperties: false
+      required: [orderId, checkoutId, sellerId, totalAmount, paidAt]
+      properties:
+        orderId: { type: string, format: uuid }
+        checkoutId: { type: string, format: uuid }
+        sellerId: { type: string, format: uuid }
+        totalAmount: { type: integer, minimum: 0 }
+        paidAt: { type: string, format: date-time }
