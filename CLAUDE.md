@@ -50,8 +50,8 @@ scripts/
 
 | 영역 | 결정 | ADR |
 |---|---|---|
-| 프레임워크 | NestJS, 모듈러 모놀리스 | 0002 |
-| 계약 | OpenAPI + AsyncAPI 스펙 우선, semver 패키지 배포 | 0003 |
+| 프레임워크 | NestJS 12, 모듈러 모놀리스 | 0002, 0012 |
+| 계약 | OpenAPI 3.1 + AsyncAPI 스펙 우선, semver 패키지 배포 | 0003, 0012 |
 | 이벤트 | Kafka + 아웃박스, 재시도 토픽 + DLT, 지연 처리는 DB 스윕 | 0004 |
 | ORM | Drizzle + drizzle-kit | 0005 |
 | 검색 | OpenSearch + Nori, Kafka 이벤트로 색인 | 0006 |
@@ -59,10 +59,14 @@ scripts/
 | LLM | 제공자 독립 `LlmClient` 포트 | 0008 |
 | 결제 | `PaymentGateway` 포트 + 토스페이먼츠(테스트) / 모의 PG 어댑터 | 0009 |
 
-### 스펙 우선 툴체인 (0단계 POC로 확정)
-- **컴파일 타임**: Hey API `@hey-api/openapi-ts`의 `nestjs` 플러그인(베타, Nest v11). 태그별 `XxxControllerMethods` 타입을 생성하고 컨트롤러가 `implements Pick<...>`로 구현 → 스펙과 어긋나면 빌드 실패
+### 스펙 우선 툴체인 (ADR 0012, POC #2)
+- **컴파일 타임**: Hey API `@hey-api/openapi-ts`(`@hey-api/typescript` + `nestjs` 플러그인, 0.x라 정확한 버전 고정). 태그별 `XxxControllerMethods` 타입을 생성하고 컨트롤러가 `implements Pick<...>`로 구현 → 스펙과 어긋나면 빌드 실패
   - 파라미터는 객체 단위(`@Param() path`, `@Query() query`, `@Body() body`)로 받는다
-- **런타임 검증**: `express-openapi-validator`(1순위) — 스펙을 직접 읽어 요청·응답 검증. 대안: `@nest-openapi/validator`, Hey API Zod 플러그인 + Zod 파이프
+  - 플러그인 문서는 Nest v11만 명시한다. 생성물이 순수 타입이라 Nest 12에서 동작하지만, Nest·플러그인 업그레이드 시 다시 확인한다
+  - 생성물(`src/generated/`)은 커밋하지 않는다. `prebuild`로 빌드마다 생성한다
+- **런타임 검증**: `express-openapi-validator`를 Nest 미들웨어로 전 경로에 건다. 요청·응답·`format` 검증, 응답 검증은 모든 환경에서 켠다. 실행 시 `openapi/` YAML이 필요하다(배포 이미지에 포함)
+- **에러 응답**: 전역 `@Catch()` 필터가 모든 예외를 RFC 9457 `application/problem+json`으로 바꾼다. 4xx는 `detail`에 원인, 5xx는 메시지를 숨기고 로그로만. 이 필터가 없으면 검증기 오류가 전부 500이 된다
+- 응답 스키마의 초과 필드는 `additionalProperties: false`가 있어야 잡힌다 → 규약은 #6
 - **문서**: YAML 스펙을 Swagger UI 또는 Scalar로 그대로 서빙
 - 쓰지 않는 것: DTO 클래스 + class-validator로 스키마 이중 정의, `@nestjs/swagger` 코드 우선 생성
 
@@ -80,12 +84,10 @@ scripts/
 
 ## 미결정
 
-- [ ] 스펙 우선 툴체인 확정 (POC 후)
-- [ ] 생성물 커밋 여부
 - [ ] AsyncAPI 호환성 검사 도구
 - [ ] 채팅 게이트웨이: Socket.IO vs ws
 - [ ] 인증 방식 (세션 vs JWT), 스토어·셀러센터·어드민 도메인 구성에 따른 CORS/쿠키 정책
 
 ## 현재 단계
 
-0단계: 주요 결정 완료 → Drizzle·Kafka·스펙 툴체인 POC, ERD 초안, 토스페이먼츠 테스트 키 발급 → 1단계(뼈대 배포).
+0단계: 주요 결정·스펙 툴체인 확정(ADR 0012) → Drizzle·Kafka POC, 스펙 공통 규약, ERD 초안, 토스페이먼츠 테스트 키 발급 → 1단계(뼈대 배포).
