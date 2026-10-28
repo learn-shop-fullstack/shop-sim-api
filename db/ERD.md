@@ -109,3 +109,57 @@ erDiagram
 - 쿠폰 사용은 주문서에 기록하고, 할인액은 주문 항목별로 나눠 스냅샷에 적는다(부분 취소·정산 계산용)
 - 환불은 결제에 묶인다. 판매자 취소처럼 요청 없이 생기는 환불도 있어 `order_issues`와의 관계는 0..1
 - 운송장 상세·상태 이력은 shop-sim-vendor가 소유한다. `shipments`에는 택배사, 운송장 번호, 마지막으로 동기화한 상태만 둔다
+
+### 알림·채팅·고객센터 (notification, chat, support)
+
+```mermaid
+erDiagram
+    notifications ||--|{ notification_receivers : "수신자별 읽음"
+    users ||--o{ notification_receivers : ""
+    users ||--o{ chat_rooms : "구매자"
+    sellers ||--o{ chat_rooms : ""
+    chat_rooms ||--o{ chat_messages : ""
+    users ||--o{ chat_messages : "발신자"
+    orders |o--o{ chat_messages : "주문 카드"
+    users ||--o{ inquiries : "1:1 문의"
+    orders |o--o{ inquiries : ""
+    inquiries ||--o{ inquiry_messages : ""
+    users ||--o{ reports : "신고자"
+```
+
+- `chat_rooms`는 (구매자, 판매자) 쌍마다 하나(유니크). 핸드북의 "연결된 주문"은 방이 아니라 메시지(주문 카드)에 둔다. 한 방에서 여러 주문을 이야기할 수 있기 때문이다
+- `reports`의 신고 대상(상품·리뷰·판매자·채팅 메시지)은 9단계에서 정한다. `stock_lots`처럼 대상별 nullable 외래 키 + `CHECK`가 기본안
+
+### 리뷰·분석·정산 (review, analytics, forecast, settlement)
+
+```mermaid
+erDiagram
+    order_items ||--o| reviews : "배송 완료 항목에만"
+    users ||--o{ reviews : ""
+    products ||--o{ reviews : ""
+    reviews ||--o{ review_images : ""
+    products ||--o| review_summaries : "긍정·부정 요약"
+    skus ||--o{ daily_sales : "일 판매량"
+    skus ||--o{ demand_forecasts : "7일 예측"
+    skus |o--o{ reorder_recommendations : ""
+    raw_materials |o--o{ reorder_recommendations : ""
+    sellers ||--o{ settlements : "월 정산"
+    settlements ||--|{ settlement_items : ""
+    orders ||--o| settlement_items : "정산 대상"
+    commission_policies ||--o{ settlement_items : "적용 정책"
+```
+
+- 리뷰는 주문 항목당 최대 1개. 구매 검증과 "자기 스토어 상품 리뷰 금지"(ROADMAP 2단계)의 근거가 주문 항목이다
+- 일 판매량·예측은 SKU 단위로 쌓고 상품 단위는 합산한다(재고·발주가 SKU·원재료 단위라서)
+- 주문은 한 번만 정산된다(`settlement_items.order_id` 유니크). 수수료율은 정산 항목에 스냅샷으로 복사한다
+
+### 관계 없이 쓰는 테이블
+
+| 테이블 | 소유 | 이유 |
+|---|---|---|
+| `outbox_messages`, `processed_messages` | 공통(이벤트) | 집계 ID를 값으로만 담는다. 이벤트는 행이 지워진 뒤에도 남아야 한다 |
+| `batch_runs`, `review_summary_runs` | 공통, review | 실행 이력 |
+| `audit_logs` | audit | 행위자가 일반 계정·운영자 두 종류다. 형태는 Better Auth POC(#17) 후 확정 |
+| `notices`, `faqs` | support | 작성자(운영자) 참조는 #17 후 확정 |
+
+**다른 레포 소유 데이터 점검**: 운송장 상세·이력(`Tracking`·`TrackingLog`), 모의 PG 거래는 shop-sim-vendor, `SimulationScenario`·`SimulationRun`은 shop-sim-loadtest에 있다. 커머스 DB에는 외부 식별자만 둔다(`shipments.tracking_number`, `payments.pg_transaction_id`).
