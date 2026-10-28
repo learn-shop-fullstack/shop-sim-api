@@ -44,6 +44,11 @@ scripts/
 
 ### 데이터
 - 마이그레이션은 `drizzle-kit generate`로 만든 SQL을 리뷰·커밋하고 적용한다. `push`는 로컬 실험에만.
+  - `db/migrations/meta/`(스냅샷·저널)도 함께 커밋한다. 다음 `generate`가 이 스냅샷과 비교한다
+  - 마이그레이션 PR은 머지 직전에 main을 rebase하고 `generate`를 다시 실행한다. 마이그레이터는 마지막 적용 시각보다 나중에 생성된 것만 적용해서, 먼저 만든 마이그레이션이 나중에 머지되면 조용히 건너뛴다 (POC #3)
+  - 미적용 마이그레이션은 한 트랜잭션으로 실행된다. `CREATE INDEX CONCURRENTLY`처럼 트랜잭션 밖에서만 되는 DDL은 별도 절차로 한다
+- 스키마에 컬럼·제약·인덱스 이름을 직접 적는다(`timestamp('expires_at', …)`, `index('payments_status_expires_at_idx')`). 1.0에서 casing API가 바뀌어도 마이그레이션이 흔들리지 않는다
+- 시각은 `timestamp(…, { withTimezone: true })`(`timestamptz`)
 - 트랜잭션 경계는 서비스 계층에서 명시적으로 잡는다. 상태 변경과 아웃박스 기록은 같은 트랜잭션.
 
 ## 기술 결정 (요약)
@@ -53,7 +58,7 @@ scripts/
 | 프레임워크 | NestJS 12, 모듈러 모놀리스 | 0002, 0012 |
 | 계약 | OpenAPI 3.1 + AsyncAPI 스펙 우선, semver 패키지 배포 | 0003, 0012 |
 | 이벤트 | Kafka + 아웃박스, 재시도 토픽 + DLT, 지연 처리는 DB 스윕 | 0004 |
-| ORM | Drizzle + drizzle-kit | 0005 |
+| ORM | Drizzle + drizzle-kit (0.45 안정판, 1.0 정식 출시 시 업그레이드 경로 확인) | 0005 |
 | 검색 | OpenSearch + Nori, Kafka 이벤트로 색인 | 0006 |
 | 도메인 | 멀티 판매자, 한 계정이 구매자 겸 판매자 | 0007 |
 | LLM | 제공자 독립 `LlmClient` 포트 | 0008 |
@@ -90,4 +95,4 @@ scripts/
 
 ## 현재 단계
 
-0단계: 주요 결정·스펙 툴체인 확정(ADR 0012) → Drizzle·Kafka POC, 스펙 공통 규약, ERD 초안, 토스페이먼츠 테스트 키 발급 → 1단계(뼈대 배포).
+0단계: 주요 결정·스펙 툴체인(ADR 0012)·스펙 규약(ADR 0013)·Drizzle POC 완료 → Kafka POC, ERD 초안, 토스페이먼츠 테스트 키 발급 → 1단계(뼈대 배포).
