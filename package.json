@@ -15,6 +15,7 @@
     "start:worker:prod": "node dist/apps/worker/apps/worker/src/main.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:check": "bash scripts/check-migrations.sh",
     "lint": "pnpm lint:code && pnpm lint:openapi",
     "lint:code": "pnpm generate && oxlint --type-aware --deny-warnings apps/ db/ drizzle.config.ts",
     "lint:openapi": "REDOCLY_SUPPRESS_UPDATE_NOTICE=true redocly lint openapi/openapi.yaml",
