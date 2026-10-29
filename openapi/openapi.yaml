@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: 운영 상태 확인
+  - name: products
+    description: 상품 (catalog 모듈)
 paths:
   /health:
     get:
@@ -22,3 +24,108 @@ paths:
       responses:
         '204':
           description: 살아 있음
+  /products/{productId}:
+    get:
+      operationId: getProduct
+      tags: [products]
+      summary: 공개 상품 단건 조회
+      description: 공개(PUBLISHED)된 상품만 돌려준다. 공개되지 않은 상품은 없는 상품과 같이 404다.
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 상품
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  responses:
+    BadRequest:
+      description: 요청이 스펙과 다름
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: 리소스가 없음
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    Problem:
+      type: object
+      description: RFC 9457 Problem Details. 클라이언트는 type으로만 분기한다
+      additionalProperties: false
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          description: about:blank 또는 /problems/<kebab-case> (CONVENTIONS.md 오류 종류 목록)
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
+        errors:
+          type: array
+          description: 검증 오류(/problems/validation-error)일 때만
+          items:
+            $ref: '#/components/schemas/ProblemError'
+    ProblemError:
+      type: object
+      additionalProperties: false
+      required: [pointer, detail]
+      properties:
+        pointer:
+          type: string
+          description: 위치 접두어를 둔 JSON Pointer. 예 #/path/productId, #/query/pageSize
+        detail:
+          type: string
+    ProductType:
+      type: string
+      enum: [FINISHED, MADE_TO_ORDER]
+      description: FINISHED 완제품, MADE_TO_ORDER 주문 후 제작
+    Product:
+      type: object
+      additionalProperties: false
+      required: [id, name, subtitle, type, price, discountRate, leadTimeDays]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+        subtitle:
+          type: [string, 'null']
+        type:
+          $ref: '#/components/schemas/ProductType'
+        price:
+          type: integer
+          minimum: 0
+          description: 정가(원). 판매가 계산(할인 끝수 처리)은 3단계에서 정한다
+        discountRate:
+          type: integer
+          minimum: 0
+          maximum: 99
+          description: 할인율(%)
+        leadTimeDays:
+          type: [integer, 'null']
+          minimum: 1
+          description: 제작 소요일. MADE_TO_ORDER일 때만 값이 있다
