@@ -13,6 +13,7 @@
     "skipLibCheck": true,
     "sourceMap": true,
     "incremental": true,
+    "rootDir": ".",
     "outDir": "./dist",
     "types": ["node"]
   }
