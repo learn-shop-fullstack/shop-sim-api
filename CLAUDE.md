@@ -81,10 +81,12 @@ scripts/
 
 ### 스펙 우선 툴체인 (ADR 0012, POC #2)
 - **컴파일 타임**: Hey API `@hey-api/openapi-ts`(`@hey-api/typescript` + `nestjs` 플러그인, 0.x라 정확한 버전 고정). 태그별 `XxxControllerMethods` 타입을 생성하고 컨트롤러가 `implements Pick<...>`로 구현 → 스펙과 어긋나면 빌드 실패
+  - 타입이 잡지 못하는 것: 경로(데코레이터에 따로 적음), 본문이 같은 상태 코드 변경(204↔200은 둘 다 `void`, `@HttpCode`로 맞춘다), `Pick`에 없는 새 operation. **CI에서** 검증기를 켠 계약 테스트와 라우트 대조 테스트(스펙 paths ↔ 등록된 라우트, 양방향)가 잡는다. 운영의 검증기는 발견용이 아니라 스펙과 다른 응답을 막는 마지막 방어선이다 (#28)
   - 파라미터는 객체 단위(`@Param() path`, `@Query() query`, `@Body() body`)로 받는다
   - 플러그인 문서는 Nest v11만 명시한다. 생성물이 순수 타입이라 Nest 12에서 동작하지만, Nest·플러그인 업그레이드 시 다시 확인한다
-  - 생성물(`src/generated/`)은 커밋하지 않는다. `prebuild`로 빌드마다 생성한다
-- **런타임 검증**: `express-openapi-validator`를 Nest 미들웨어로 전 경로에 건다. 요청·응답·`format` 검증, 응답 검증은 모든 환경에서 켠다. 실행 시 `openapi/` YAML이 필요하다(배포 이미지에 포함)
+  - 생성 입력은 원본이 아니라 `openapi:bundle`이 합친 `dist/openapi/openapi.yaml`이다. 원본을 도메인별 파일로 나눠도 생성·검증·패키지 쪽은 바뀌지 않는다
+  - 생성물(`apps/<앱>/src/generated/`)은 커밋하지 않는다. `build`·`start:api`·`lint:code`가 앞에서 `pnpm generate`를 실행한다. 개발 서버가 떠 있는 중에 스펙을 고치면 다시 시작해야 반영된다
+- **런타임 검증**: `express-openapi-validator`를 Nest 미들웨어로 전 경로에 건다. 요청·응답·`format` 검증, 응답 검증은 모든 환경에서 켠다. 실행 시 합친 스펙 `dist/openapi/openapi.yaml`이 필요하다(배포 이미지에 포함)
 - **에러 응답**: 전역 `@Catch()` 필터가 모든 예외를 RFC 9457 `application/problem+json`으로 바꾼다. 4xx는 `detail`에 원인, 5xx는 메시지를 숨기고 로그로만. 이 필터가 없으면 검증기 오류가 전부 500이 된다
 - 응답 스키마의 초과 필드는 `additionalProperties: false`가 있어야 잡힌다 → 규약은 #6
 - **문서**: YAML 스펙을 Swagger UI 또는 Scalar로 그대로 서빙
@@ -128,4 +130,4 @@ scripts/
 
 ## 현재 단계
 
-1단계(뼈대 배포) 진행 중. 완료: Nest 프로젝트 세팅(#24), `openapi/` 스펙(헬스체크, 상품 단건·목록, #26). 다음: 서버 인터페이스 생성 파이프라인(Hey API) → 구현·계약 테스트.
+1단계(뼈대 배포) 진행 중. 완료: Nest 프로젝트 세팅(#24), `openapi/` 스펙(#26), 생성 파이프라인(#28). 다음: 상품 API 구현(검증기·Problem 필터·DB 연결) + 계약 테스트.
