@@ -9,6 +9,7 @@ pnpm lint:openapi
 ## 버전
 
 - `openapi: 3.1.1`
+- `info.version`은 스펙 패키지(`@learn-shop-fullstack/shop-sim-api-openapi`)의 버전이다. 스펙 내용(설명 포함)을 바꾸는 PR은 같은 PR에서 올린다. BREAKING이면 메이저, 필드·엔드포인트 추가는 마이너, 설명만 고치면 패치. 값은 세 자리 `X.Y.Z`(`1.0`처럼 두 자리면 YAML이 숫자로 읽어 CI가 실패한다). 올렸는지는 CI가 검사하고(`pnpm openapi:check-version`), 몇을 올렸는지는 리뷰가 본다
 - null 허용은 `type: [string, 'null']`처럼 쓴다. `nullable`은 3.1에서 없어진 키워드다 **[린트]**
 
 ## 이름

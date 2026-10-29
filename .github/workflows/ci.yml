@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# 기본 GITHUB_TOKEN 권한을 읽기로 줄인다. 쓰기가 필요한 job만 따로 연다
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    # job 옆에 뜨는 컨테이너. 이미지는 로컬(shop-sim-infra compose)과 같게 둔다(uuidv7()는 18 이상)
+    services:
+      postgres:
+        image: postgres:18.6-trixie
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        # 러너는 health check가 통과할 때까지 첫 단계를 시작하지 않는다. 이미지는 초기화 중에 소켓으로만
+        # 받는 임시 서버를 띄웠다가 재시작하므로, -h로 TCP를 확인해야 초기화가 끝난 뒤에 통과한다
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      # 액션은 태그가 아니라 커밋 SHA로 고정한다(태그는 옮길 수 있다). 주석의 버전은 사람이 읽는 용도
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # 토큰을 .git/config에 남기지 않는다. 이후 단계에서 git push가 필요 없다
+          persist-credentials: false
+          # 스펙 버전 검사가 main과의 merge-base를 찾으려면 히스토리가 필요하다(기본값 1은 마지막 커밋만)
+          fetch-depth: 0
+      # mise.toml의 Node·pnpm을 설치하고 PATH에 올린다. 버전의 출처는 mise.toml 하나다
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      # 잠금 파일과 package.json이 어긋나면 고치지 않고 실패한다
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      # 스키마 코드만 고치고 마이그레이션을 생성하지 않은 PR을 막는다. 계약 테스트는 커밋된 마이그레이션으로
+      # 만든 DB에서 돌아서, 앱이 새 컬럼을 쓰기 전까지는 어긋남을 잡지 못한다
+      - run: pnpm db:check
+      # info.version이 semver(X.Y.Z)인지 검사하고 배포할 패키지 디렉터리를 만든다
+      - run: pnpm openapi:pack
+      # 스펙 내용이 바뀌었으면 버전도 올렸는지 본다. main 푸시는 이미 PR에서 검사했다
+      - if: github.event_name == 'pull_request'
+        run: pnpm openapi:check-version "origin/$BASE_REF"
+        env:
+          # 표현식을 run에 직접 넣지 않고 환경 변수로 넘긴다(스크립트 주입 방지 관례)
+          BASE_REF: ${{ github.base_ref }}
+      # DB 없이 도는 단위 테스트. 라우트 대조 테스트(스펙 paths ↔ 등록 라우트)도 여기 있다
+      - run: pnpm test
+      # tsc 빌더라 생성 타입과 컨트롤러가 어긋나면 여기서 실패한다
+      - run: pnpm build
+      # 검증기를 켠 앱을 실제 Postgres에 띄운다. setup이 shop_sim_test를 만들고 커밋된 마이그레이션을 적용한다
+      - run: pnpm test:contract
+        env:
+          TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/shop_sim_test
+
+  # main에 머지된 커밋의 CI가 통과하면 스펙 패키지를 배포한다. 버전이 이미 있으면 건너뛴다
+  release-openapi:
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # 연속 머지로 두 실행이 겹치면 같은 버전을 동시에 배포하려 한다. 차례로 돌린다
+    concurrency:
+      group: release-openapi
+      cancel-in-progress: false
+    permissions:
+      contents: write # 태그·릴리스
+      packages: write # GitHub Packages 배포
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # 릴리스 노트를 이전 openapi-v* 태그부터 만들려고 태그와 히스토리를 받는다
+          fetch-depth: 0
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      - run: pnpm install --frozen-lockfile
+      - id: pack
+        run: |
+          pnpm openapi:pack
+          echo "version=$(jq -r .version dist/openapi-package/package.json)" >> "$GITHUB_OUTPUT"
+      - name: 패키지 배포
+        working-directory: dist/openapi-package
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.pack.outputs.version }}
+        run: |
+          # publishConfig.registry는 publish에만 적용된다. npm view도 GitHub Packages에 묻도록 스코프를 잇는다.
+          # 토큰은 값이 아니라 변수 이름을 파일에 쓴다. npm이 읽을 때 환경 변수로 바꾼다
+          {
+            echo '@learn-shop-fullstack:registry=https://npm.pkg.github.com'
+            echo '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}'
+          } > .npmrc
+          name=$(jq -r .name package.json)
+          if npm view "$name@$VERSION" version >/dev/null 2>&1; then
+            echo "$name@$VERSION 이미 배포됨, 건너뜀"
+          else
+            npm publish
+          fi
+      - name: 태그·릴리스 노트
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.pack.outputs.version }}
+        run: |
+          tag="openapi-v$VERSION"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "$tag 릴리스 있음, 건너뜀"; exit 0
+          fi
+          # 이전 스펙 릴리스부터 openapi/를 건드린 커밋 제목을 모은다. 첫 릴리스면 처음부터
+          prev=$(git tag --list 'openapi-v*' --sort=-v:refname | head -n 1)
+          notes=$(git log "${prev:+$prev..}HEAD" --format='- %s' -- openapi/)
+          gh release create "$tag" --target "$GITHUB_SHA" --title "OpenAPI 스펙 $VERSION" \
+            --notes "${prev:+$prev 이후 }openapi/ 변경 커밋:"$'\n\n'"$notes"

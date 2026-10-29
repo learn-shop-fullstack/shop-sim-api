@@ -47,6 +47,7 @@ scripts/
 - 마이그레이션은 `drizzle-kit generate`로 만든 SQL을 리뷰·커밋하고 적용한다. `push`는 로컬 실험에만.
   - `db/migrations/meta/`(스냅샷·저널)도 함께 커밋한다. 다음 `generate`가 이 스냅샷과 비교한다
   - 마이그레이션 PR은 머지 직전에 main을 rebase하고 `generate`를 다시 실행한다. 마이그레이터는 마지막 적용 시각보다 나중에 생성된 것만 적용해서, 먼저 만든 마이그레이션이 나중에 머지되면 조용히 건너뛴다 (POC #3)
+  - `pnpm db:check`(CI 필수)가 스냅샷 충돌(`drizzle-kit check`)과 마이그레이션 누락을 잡는다. `drizzle-kit generate`는 TTY가 없으면 이름 변경 프롬프트에서 오류를 찍고도 종료 코드 0으로 끝나서, 출력의 `No schema changes, nothing to migrate` 문구로 판정한다. drizzle-kit을 올리면 이 문구를 확인한다 (#32)
   - 미적용 마이그레이션은 한 트랜잭션으로 실행된다. `CREATE INDEX CONCURRENTLY`처럼 트랜잭션 밖에서만 되는 DDL은 별도 절차로 한다
 - 스키마에 컬럼·제약·인덱스 이름을 직접 적는다(`timestamp('expires_at', …)`, `index('payments_status_expires_at_idx')`). 1.0에서 casing API가 바뀌어도 마이그레이션이 흔들리지 않는다
 - 시각은 `timestamp(…, { withTimezone: true })`(`timestamptz`)
@@ -66,6 +67,18 @@ scripts/
   - `pnpm test`는 DB 없이 도는 단위 테스트, `pnpm test:contract`는 실제 Postgres의 `shop_sim_test`(`TEST_DATABASE_URL`)에 앱을 띄운다. DB가 없으면 계약 테스트는 실패한다(의도). 마이그레이션 적용 기록이 꼬이면 `shop_sim_test`를 지우고 다시 실행한다 (#30)
 - pnpm은 허용 목록에 없는 설치 스크립트가 있으면 설치를 실패시킨다. 새 의존성이 스크립트를 가지면 `pnpm-workspace.yaml`의 `allowBuilds`에 허용(`true`) 또는 거부(`false`)를 명시하고 이유를 적는다 (#30)
 - 앱끼리 공유하는 코드(`db/` 등)는 레포 루트에 두고 상대 경로로 import한다. 그래서 두 앱의 `rootDir`이 레포 루트이고, 산출물은 `dist/apps/<앱>/apps/<앱>/src/main.js`처럼 소스 구조를 그대로 따른다. `nest start`는 진입 파일을 알아서 찾는다. 경로 별칭은 Vitest에도 따로 맞춰야 해서 쓰지 않는다 (#30)
+
+### CI (#32)
+- `.github/workflows/ci.yml` 하나다. `ci` job(PR·main 푸시)은 린트 → `db:check` → `openapi:pack` → 스펙 버전 검사(PR만) → 단위 테스트 → 빌드 → 계약 테스트(Postgres 서비스 컨테이너). `release-openapi` job은 main에서 `ci`가 통과한 뒤에만 돈다
+- main ruleset이 `ci` 체크 통과를 요구하고 strict(최신 main 포함)다. job 이름을 바꾸면 ruleset의 체크 이름도 함께 바꾼다. 안 바꾸면 모든 PR이 대기 상태로 멈춘다
+- 액션은 커밋 SHA로 고정하고 버전은 주석에 적는다. 올릴 때 둘을 같이 바꾼다. 토큰 권한은 기본 `contents: read`, 쓰기는 `release-openapi` job에만 연다
+- 도구 버전은 `mise.toml`이 유일한 출처다(`jdx/mise-action`이 읽는다)
+
+### 스펙 패키지 (#32)
+- `@learn-shop-fullstack/shop-sim-api-openapi`(GitHub Packages)에 합친 `openapi.yaml` 하나를 담는다. 버전의 출처는 `info.version` 하나다. `packages/openapi/package.json`에는 version이 없고 `pnpm openapi:pack`이 넣어 `dist/openapi-package/`를 만든다
+- 스펙 내용을 바꾸면 같은 PR에서 `info.version`을 올린다(`openapi/CONVENTIONS.md` "버전"). `pnpm openapi:check-version`이 main과의 merge-base 시점 스펙과 비교한다
+- 배포는 main 머지마다 시도하고, 버전이 이미 있으면 건너뛴다. 태그 `openapi-v<버전>`과 릴리스 노트(이전 태그부터 `openapi/`를 건드린 커밋 제목)도 같은 방식이다. 머지가 곧 외부 공개다
+- 소비자는 공개 패키지여도 설치에 토큰이 필요하다(GitHub Packages 정책). `.npmrc`에 `@learn-shop-fullstack:registry=https://npm.pkg.github.com`과 `read:packages` 토큰, CI는 패키지 설정에서 소비 레포에 읽기 권한을 준다
 
 ### 로컬 실행
 - 데이터 스택은 `../shop-sim-infra/compose/local`을 띄운다(사용법은 그 README)
@@ -141,4 +154,4 @@ scripts/
 
 ## 현재 단계
 
-1단계(뼈대 배포) 진행 중. 완료: Nest 프로젝트 세팅(#24), `openapi/` 스펙(#26), 생성 파이프라인(#28), 상품 API 구현 + 계약 테스트(#30). 다음: CI(린트 → 생성 → 테스트, 계약 테스트용 Postgres 서비스 컨테이너, 스펙 패키지 배포). #30 코멘트의 후속 메모를 해당 항목에서 반영한다.
+1단계(뼈대 배포) 진행 중. 완료: Nest 프로젝트 세팅(#24), `openapi/` 스펙(#26), 생성 파이프라인(#28), 상품 API 구현 + 계약 테스트(#30), CI + 스펙 패키지 배포(#32). 1단계의 남은 항목은 web·infra 쪽이다(스펙 패키지 소비, 배포). #30 코멘트의 남은 후속 메모는 해당 항목에서 반영한다(마이그레이션 일치 검사는 #32에서 반영).
