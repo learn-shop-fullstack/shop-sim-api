@@ -1,3 +1,5 @@
 node_modules/
 dist/
 .env
+# Hey API 생성물 (pnpm generate)
+apps/*/src/generated/
