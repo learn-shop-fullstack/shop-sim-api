@@ -2,7 +2,7 @@ import { STATUS_CODES } from 'node:http';
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
 import type { HttpError } from 'express-openapi-validator/dist/framework/types.js';
-import type { Problem } from './generated/openapi/types.gen.js';
+import type { Problem, ProblemError } from './generated/openapi/types.gen.js';
 
 // 모든 예외를 RFC 9457 Problem Details로 바꾼다(openapi/CONVENTIONS.md "에러 응답").
 // 4xx는 detail에 원인을 담고, 5xx는 내부 정보를 숨기고 로그로만 남긴다
@@ -27,6 +27,14 @@ export class ProblemDetailsFilter implements ExceptionFilter {
     if (status < 500 && exception instanceof Error) {
       problem.detail = exception.message;
     }
+    if (status === 400 && isValidatorError(exception)) {
+      problem.type = '/problems/validation-error';
+      problem.title = 'Validation Error';
+      problem.errors = exception.errors.flatMap(({ path, message }): ProblemError[] => {
+        const pointer = toPointer(path);
+        return pointer ? [{ pointer, detail: message }] : [];
+      });
+    }
     if (status >= 500) {
       this.logger.error(exception instanceof Error ? exception.stack : exception);
     }
@@ -38,6 +46,24 @@ export class ProblemDetailsFilter implements ExceptionFilter {
     httpAdapter.setHeader(ctx.getResponse(), 'Content-Type', 'application/problem+json');
     httpAdapter.reply(ctx.getResponse(), problem, status);
   }
+}
+
+// 검증기 위치의 첫 칸(요청 객체의 속성 이름)을 OpenAPI 파라미터의 in 값으로 바꾼다
+const LOCATIONS: Record<string, string> = {
+  params: 'path',
+  query: 'query',
+  headers: 'header',
+  cookies: 'cookie',
+  body: 'body',
+};
+
+// 검증기의 /params/productId를 규약의 #/path/productId로 바꾼다. 나머지는 Ajv가 이미
+// JSON Pointer로 이스케이프해 준다. 위치를 모르는 값(일부 오류는 요청 URL 경로를 담는다)은
+// 포인터로 내보내지 않는다
+export function toPointer(path: string): string | undefined {
+  const [, first = '', ...rest] = path.split('/');
+  const location = Object.hasOwn(LOCATIONS, first) ? LOCATIONS[first] : undefined;
+  return location && ['#', location, ...rest].join('/');
 }
 
 function statusOf(exception: unknown): number {
