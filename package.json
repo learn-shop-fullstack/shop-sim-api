@@ -7,9 +7,11 @@
     "node": "26.12.1"
   },
   "scripts": {
-    "build": "nest build api",
+    "build": "nest build api && nest build worker",
     "start:api": "nest start api --watch",
-    "start:api:prod": "node dist/apps/api/main.js"
+    "start:api:prod": "node dist/apps/api/main.js",
+    "start:worker": "nest start worker --watch",
+    "start:worker:prod": "node dist/apps/worker/main.js"
   },
   "dependencies": {
     "@nestjs/common": "12.3.2",
