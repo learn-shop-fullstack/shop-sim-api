@@ -19,7 +19,8 @@
     "lint:code": "pnpm generate && oxlint --type-aware --deny-warnings apps/ db/ drizzle.config.ts",
     "lint:openapi": "REDOCLY_SUPPRESS_UPDATE_NOTICE=true redocly lint openapi/openapi.yaml",
     "openapi:bundle": "REDOCLY_SUPPRESS_UPDATE_NOTICE=true redocly bundle openapi/openapi.yaml --output dist/openapi/openapi.yaml",
-    "test": "pnpm generate && vitest run"
+    "test": "pnpm generate && vitest run --project unit",
+    "test:contract": "pnpm generate && vitest run --project contract"
   },
   "dependencies": {
     "@nestjs/common": "12.3.2",
