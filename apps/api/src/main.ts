@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.js';
-import { loadConfig } from './config.js';
+import type { Config } from './config.js';
+import { CONFIG } from './config.module.js';
 
-const config = loadConfig();
 const app = await NestFactory.create(AppModule);
-await app.listen(config.PORT);
+await app.listen(app.get<Config>(CONFIG).PORT);
