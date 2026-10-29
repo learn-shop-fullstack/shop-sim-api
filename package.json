@@ -7,13 +7,14 @@
     "node": "26.12.1"
   },
   "scripts": {
-    "build": "nest build api && nest build worker",
-    "start:api": "nest start api --watch --env-file .env",
+    "generate": "pnpm openapi:bundle && openapi-ts",
+    "build": "pnpm generate && nest build api && nest build worker",
+    "start:api": "pnpm generate && nest start api --watch --env-file .env",
     "start:api:prod": "node dist/apps/api/main.js",
     "start:worker": "nest start worker --watch --env-file .env",
     "start:worker:prod": "node dist/apps/worker/main.js",
     "lint": "pnpm lint:code && pnpm lint:openapi",
-    "lint:code": "oxlint --type-aware --deny-warnings apps/",
+    "lint:code": "pnpm generate && oxlint --type-aware --deny-warnings apps/",
     "lint:openapi": "REDOCLY_SUPPRESS_UPDATE_NOTICE=true redocly lint openapi/openapi.yaml",
     "openapi:bundle": "REDOCLY_SUPPRESS_UPDATE_NOTICE=true redocly bundle openapi/openapi.yaml --output dist/openapi/openapi.yaml",
     "test": "vitest run"
@@ -27,6 +28,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@hey-api/openapi-ts": "0.99.0",
     "@nestjs/cli": "12.0.11",
     "@redocly/cli": "2.71.1",
     "@types/node": "26.6.5",
