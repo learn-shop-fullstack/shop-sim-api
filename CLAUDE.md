@@ -78,7 +78,8 @@ scripts/
 - `@learn-shop-fullstack/shop-sim-api-openapi`(GitHub Packages)에 합친 `openapi.yaml` 하나를 담는다. 버전의 출처는 `info.version` 하나다. `packages/openapi/package.json`에는 version이 없고 `pnpm openapi:pack`이 넣어 `dist/openapi-package/`를 만든다
 - 스펙 내용을 바꾸면 같은 PR에서 `info.version`을 올린다(`openapi/CONVENTIONS.md` "버전"). `pnpm openapi:check-version`이 main과의 merge-base 시점 스펙과 비교한다
 - 배포는 main 머지마다 시도하고, 버전이 이미 있으면 건너뛴다. 태그 `openapi-v<버전>`과 릴리스 노트(이전 태그부터 `openapi/`를 건드린 커밋 제목)도 같은 방식이다. 머지가 곧 외부 공개다
-- 소비자는 공개 패키지여도 설치에 토큰이 필요하다(GitHub Packages 정책). `.npmrc`에 `@learn-shop-fullstack:registry=https://npm.pkg.github.com`과 `read:packages` 토큰, CI는 패키지 설정에서 소비 레포에 읽기 권한을 준다
+- 소비자는 공개 패키지여도 설치에 `read:packages` 토큰이 필요하다(GitHub Packages 정책). 소비 레포 `.npmrc`에는 `@learn-shop-fullstack:registry=https://npm.pkg.github.com`만 두고 토큰은 레포 밖에서 넣는다. pnpm은 레포 `.npmrc`의 토큰과 `${ENV}`를 무시한다(web#6). CI 읽기 권한 방식은 web api-client 항목에서 정한다
+- 오류 응답 예시는 소비자의 목 서버(Prism)가 그대로 돌려주는 계약이다. 규칙은 `openapi/CONVENTIONS.md` "예시 (목 서버)" (#34)
 
 ### 로컬 실행
 - 데이터 스택은 `../shop-sim-infra/compose/local`을 띄운다(사용법은 그 README)
@@ -154,4 +155,4 @@ scripts/
 
 ## 현재 단계
 
-1단계(뼈대 배포) 진행 중. 완료: Nest 프로젝트 세팅(#24), `openapi/` 스펙(#26), 생성 파이프라인(#28), 상품 API 구현 + 계약 테스트(#30), CI + 스펙 패키지 배포(#32). 1단계의 남은 항목은 web·infra 쪽이다(스펙 패키지 소비, 배포). #30 코멘트의 남은 후속 메모는 해당 항목에서 반영한다(마이그레이션 일치 검사는 #32에서 반영).
+1단계(뼈대 배포) 진행 중. 완료: Nest 프로젝트 세팅(#24), `openapi/` 스펙(#26), 생성 파이프라인(#28), 상품 API 구현 + 계약 테스트(#30), CI + 스펙 패키지 배포(#32), 오류 응답 예시(#34). 1단계의 남은 항목은 web·infra 쪽이다(스펙 패키지 소비, 배포). #30 코멘트의 남은 후속 메모는 해당 항목에서 반영한다(마이그레이션 일치 검사는 #32에서 반영).

@@ -1,7 +1,7 @@
 openapi: 3.1.1
 info:
   title: shop-sim API
-  version: 0.1.0
+  version: 0.1.1
   description: 멀티 판매자 마켓플레이스 shop-sim의 HTTP API. 규약은 openapi/CONVENTIONS.md
 servers:
   # API는 하위 도메인(api.<도메인>)으로 공개하므로 경로 접두어를 두지 않는다.
