@@ -19,7 +19,7 @@
     "lint:code": "pnpm generate && oxlint --type-aware --deny-warnings apps/ db/ drizzle.config.ts",
     "lint:openapi": "REDOCLY_SUPPRESS_UPDATE_NOTICE=true redocly lint openapi/openapi.yaml",
     "openapi:bundle": "REDOCLY_SUPPRESS_UPDATE_NOTICE=true redocly bundle openapi/openapi.yaml --output dist/openapi/openapi.yaml",
-    "test": "vitest run"
+    "test": "pnpm generate && vitest run"
   },
   "dependencies": {
     "@nestjs/common": "12.3.2",
@@ -35,6 +35,7 @@
   "devDependencies": {
     "@hey-api/openapi-ts": "0.99.0",
     "@nestjs/cli": "12.0.11",
+    "@nestjs/testing": "12.3.2",
     "@redocly/cli": "2.71.1",
     "@types/node": "26.6.5",
     "@types/pg": "8.23.1",
@@ -43,6 +44,7 @@
     "oxlint-tsgolint": "7.0.2005",
     "typescript": "6.0.3",
     "vite": "8.3.5",
-    "vitest": "5.0.5"
+    "vitest": "5.0.5",
+    "yaml": "2.9.1"
   }
 }
