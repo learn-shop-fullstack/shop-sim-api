@@ -41,8 +41,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProductPage'
         '400':
-          $ref: '#/components/responses/BadRequest'
-          description: 요청이 스펙과 다름(/problems/validation-error) 또는 pageToken이 잘못됨(/problems/invalid-page-token)
+          $ref: '#/components/responses/ListBadRequest'
   /products/{productId}:
     get:
       operationId: getProduct
@@ -105,6 +104,34 @@ components:
                 errors:
                   - pointer: '#/path/productId'
                     detail: must match format "uuid"
+    # 커서 목록 operation(listXxx)의 400. invalid-page-token 예시는 올바른 요청에
+    # Prefer: code=400, example=invalidPageToken을 붙여야 나온다
+    ListBadRequest:
+      description: 요청이 스펙과 다름(/problems/validation-error) 또는 pageToken이 잘못됨(/problems/invalid-page-token)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            validationError:
+              summary: 요청 검증 오류
+              value:
+                type: /problems/validation-error
+                title: Validation Error
+                status: 400
+                detail: request/query/pageSize must be >= 1
+                instance: /products
+                errors:
+                  - pointer: '#/query/pageSize'
+                    detail: must be >= 1
+            invalidPageToken:
+              summary: 잘못된 pageToken
+              value:
+                type: /problems/invalid-page-token
+                title: Invalid Page Token
+                status: 400
+                detail: 토큰을 해석할 수 없다
+                instance: /products
     NotFound:
       description: 리소스가 없음
       content:
