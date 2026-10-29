@@ -59,3 +59,60 @@ jobs:
       - run: pnpm test:contract
         env:
           TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/shop_sim_test
+
+  # main에 머지된 커밋의 CI가 통과하면 스펙 패키지를 배포한다. 버전이 이미 있으면 건너뛴다
+  release-openapi:
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # 연속 머지로 두 실행이 겹치면 같은 버전을 동시에 배포하려 한다. 차례로 돌린다
+    concurrency:
+      group: release-openapi
+      cancel-in-progress: false
+    permissions:
+      contents: write # 태그·릴리스
+      packages: write # GitHub Packages 배포
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # 릴리스 노트를 이전 openapi-v* 태그부터 만들려고 태그와 히스토리를 받는다
+          fetch-depth: 0
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      - run: pnpm install --frozen-lockfile
+      - id: pack
+        run: |
+          pnpm openapi:pack
+          echo "version=$(jq -r .version dist/openapi-package/package.json)" >> "$GITHUB_OUTPUT"
+      - name: 패키지 배포
+        working-directory: dist/openapi-package
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.pack.outputs.version }}
+        run: |
+          # publishConfig.registry는 publish에만 적용된다. npm view도 GitHub Packages에 묻도록 스코프를 잇는다.
+          # 토큰은 값이 아니라 변수 이름을 파일에 쓴다. npm이 읽을 때 환경 변수로 바꾼다
+          {
+            echo '@learn-shop-fullstack:registry=https://npm.pkg.github.com'
+            echo '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}'
+          } > .npmrc
+          name=$(jq -r .name package.json)
+          if npm view "$name@$VERSION" version >/dev/null 2>&1; then
+            echo "$name@$VERSION 이미 배포됨, 건너뜀"
+          else
+            npm publish
+          fi
+      - name: 태그·릴리스 노트
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.pack.outputs.version }}
+        run: |
+          tag="openapi-v$VERSION"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "$tag 릴리스 있음, 건너뜀"; exit 0
+          fi
+          # 이전 스펙 릴리스부터 openapi/를 건드린 커밋 제목을 모은다. 첫 릴리스면 처음부터
+          prev=$(git tag --list 'openapi-v*' --sort=-v:refname | head -n 1)
+          notes=$(git log "${prev:+$prev..}HEAD" --format='- %s' -- openapi/)
+          gh release create "$tag" --target "$GITHUB_SHA" --title "OpenAPI 스펙 $VERSION" \
+            --notes "${prev:+$prev 이후 }openapi/ 변경 커밋:"$'\n\n'"$notes"
