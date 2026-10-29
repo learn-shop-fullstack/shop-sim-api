@@ -232,20 +232,23 @@ Better Auth가 읽고 쓰는 테이블이다. TS 키는 Better Auth 필드 이�
 **`products`**
 | 컬럼 | 타입 | 제약 | 설명 |
 |---|---|---|---|
-| `seller_id` | uuid | NOT NULL, FK `sellers` | |
-| `category_id` | uuid | NOT NULL, FK `categories` | 말단 카테고리만(앱에서 검사) |
-| `name`, `subtitle` | text | `name` NOT NULL | |
+| `seller_id` | uuid | NOT NULL, FK `sellers` | FK는 `sellers`가 생기는 2단계에 건다 |
+| `category_id` | uuid | NOT NULL, FK `categories` | 말단 카테고리만(앱에서 검사). FK는 `categories`가 생길 때 건다 |
+| `name`, `subtitle` | text | `name` NOT NULL, 빈 문자열 금지(CHECK) | |
 | `type` | `product_type` | NOT NULL | `FINISHED` / `MADE_TO_ORDER` |
 | `price` | integer | NOT NULL, ≥ 0 | 정가(원). SKU 추가금은 `skus.extra_price` |
 | `discount_rate` | integer | NOT NULL DEFAULT 0, 0~99 | 할인율(%). 판매가 끝수 처리는 3단계 상품 API에서 정한다 |
 | `detail_content` | jsonb | NOT NULL | 현재 상세 본문(Tiptap JSON) |
-| `lead_time_days` | integer | `MADE_TO_ORDER`면 NOT NULL (CHECK) | 제작 소요일 |
+| `lead_time_days` | integer | `MADE_TO_ORDER`일 때만 값이 있고 ≥ 1 (CHECK) | 제작 소요일 |
 | `status` | `product_status` | NOT NULL DEFAULT `DRAFT` | `DRAFT` / `PUBLISHED` / `SCHEDULED` / `SUSPENDED` |
 | `scheduled_at` | timestamptz | `SCHEDULED`면 NOT NULL (CHECK) | 예약 발행 시각 |
-| `published_at` | timestamptz | | 처음 공개된 시각 |
+| `published_at` | timestamptz | `PUBLISHED`면 NOT NULL (CHECK) | 처음 공개된 시각 |
 | `version` | integer | NOT NULL DEFAULT 1 | 낙관적 락 |
 
-인덱스: (`seller_id`, `status`) 셀러센터 목록, (`scheduled_at`) `WHERE status = 'SCHEDULED'` 예약 발행 스윕
+인덱스: (`seller_id`, `status`) 셀러센터 목록, (`scheduled_at`) `WHERE status = 'SCHEDULED'` 예약 발행 스윕, (`published_at DESC`, `id DESC`) `WHERE status = 'PUBLISHED'` 공개 상품 목록(커서)
+
+- CHECK는 스펙(`Product` 스키마)이 허용하지 않는 값을 DB에서 먼저 거절한다. 저장된 값이 스펙과 다르면 조회 때 응답 검증이 500으로 막기 때문이다
+- `DESC` 정렬은 NULL을 맨 앞에 둬서, 공개 상품에 `published_at`이 없으면 목록 순서와 커서가 깨진다 → `PUBLISHED`면 NOT NULL
 
 **`product_images`**: `product_id`(FK, `ON DELETE CASCADE`), `original_key`(text, R2 객체 키), `resize_status`(`PENDING` / `DONE` / `FAILED`), `sort_order`(integer, 0번이 대표). 인덱스 (`product_id`, `sort_order`)
 
