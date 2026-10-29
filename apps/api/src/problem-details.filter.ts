@@ -1,4 +1,5 @@
 import { STATUS_CODES } from 'node:http';
+import { inspect } from 'node:util';
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
 import type { HttpError } from 'express-openapi-validator/dist/framework/types.js';
@@ -39,7 +40,7 @@ export class ProblemDetailsFilter implements ExceptionFilter {
       // 응답 검증 실패는 어긋난 위치(/response/internalCost 등)가 errors에만 있다. 응답에는 숨기고 로그에만 남긴다.
       // Logger에 두 번째 인자를 주면 문자열에 따라 context로 해석될 수 있어 한 문자열로 합친다
       const errors = isValidatorError(exception) ? `\nerrors: ${JSON.stringify(exception.errors)}` : '';
-      this.logger.error(exception instanceof Error ? `${exception.stack}${errors}` : exception);
+      this.logger.error(exception instanceof Error ? `${withCauses(exception)}${errors}` : exception);
     }
 
     // 405는 허용 메서드를 Allow 헤더로 알려야 한다(RFC 9110). 검증기가 값을 담아 준다
@@ -67,6 +68,18 @@ export function toPointer(path: string): string | undefined {
   const [, first = '', ...rest] = path.split('/');
   const location = Object.hasOwn(LOCATIONS, first) ? LOCATIONS[first] : undefined;
   return location && ['#', location, ...rest].join('/');
+}
+
+// Error.cause를 따라가며 stack을 잇는다. 드라이버 오류(연결 거부·타임아웃)는 ORM 오류
+// (DrizzleQueryError)의 cause에만 있다. cause가 서로를 가리키는 경우를 막으려고 깊이를 제한한다
+function withCauses(error: Error): string {
+  let text = error.stack ?? String(error);
+  let cause: unknown = error.cause;
+  for (let depth = 0; cause !== undefined && depth < 5; depth++) {
+    text += `\ncaused by: ${cause instanceof Error ? (cause.stack ?? cause.message) : inspect(cause)}`;
+    cause = cause instanceof Error ? cause.cause : undefined;
+  }
+  return text;
 }
 
 function statusOf(exception: unknown): number {

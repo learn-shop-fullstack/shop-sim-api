@@ -76,6 +76,20 @@ describe('ProblemDetailsFilter', () => {
     logError.mockRestore();
   });
 
+  it('5xx 로그에 cause 체인을 남기고 순환 cause에서 멈춘다', () => {
+    const logError = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+    const driver = new Error('connect ECONNREFUSED 127.0.0.1:5432');
+    const exception = new Error('Failed query: select 1', { cause: driver });
+    driver.cause = exception;
+    run(exception);
+    const logged = String(logError.mock.calls[0][0]);
+    expect(logged).toContain('caused by: Error: connect ECONNREFUSED');
+    expect(logged.match(/caused by:/g)).toHaveLength(5);
+    run(new Error('x', { cause: { code: 'E1' } }));
+    expect(String(logError.mock.calls[1][0])).toContain("caused by: { code: 'E1' }");
+    logError.mockRestore();
+  });
+
   it.each([new Error('DB 비밀번호 틀림'), 'throw된 문자열', new ServiceUnavailableException('내부 사정')])(
     '5xx는 detail을 숨기고 로그로만 남긴다 (%s)',
     (exception) => {
