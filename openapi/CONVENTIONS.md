@@ -66,6 +66,16 @@ pnpm lint:openapi
 | `/problems/validation-error` | 400 | 요청이 스펙과 다름. `errors`에 위치별 원인 |
 | `/problems/invalid-page-token` | 400 | `pageToken`이 잘못됐거나, 발급 때와 다른 조건(필터·정렬)으로 쓰임 |
 
+### 예시 (목 서버)
+
+소비자는 이 스펙을 Prism 목 서버로 띄워 화면을 먼저 만든다. Prism은 응답의 `examples`를 그대로 돌려주므로 오류 예시가 곧 소비자가 개발하는 오류 응답이다.
+
+- 공통 오류 응답에는 그 응답으로 나갈 수 있는 type마다 예시를 둔다. 새 type을 위 표에 추가하면 그 type을 쓰는 공통 응답에 예시도 넣는다
+- 값은 실제 서버 출력과 같게 쓴다. `title`은 `apps/api/src/problems.ts` 상수, `detail`은 서버가 실제로 내는 문구. 스키마와 어긋난 예시는 린트가 실패시킨다 **[린트]**
+- 400 응답의 첫 예시는 `validation-error`다. Prism은 요청 검증에 실패하면 첫 예시를 돌려준다
+- 커서 목록 operation(`listXxx`)의 400은 `ListBadRequest`(validation-error, invalid-page-token)를 쓴다
+- Prism은 비즈니스 오류(잘못된 토큰, 없는 리소스)를 스스로 내지 않는다. 스키마에 맞는 요청이면 성공 응답이다. 소비자는 `Prefer: code=400, example=invalidPageToken`처럼 상태 코드와 예시 이름을 지정해 받는다
+
 ## 페이지네이션 (Google AIP-158)
 
 목록 operation(`listXxx`)은 모두 커서 방식을 쓴다. 행 번호로 이동하고 전체 개수를 보여야 하는 그리드 목록(셀러센터·어드민의 AG Grid)만 오프셋을 함께 연다.
