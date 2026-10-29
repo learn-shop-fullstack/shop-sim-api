@@ -4,6 +4,7 @@ import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logge
 import { HttpAdapterHost } from '@nestjs/core';
 import type { HttpError } from 'express-openapi-validator/dist/framework/types.js';
 import type { Problem, ProblemError } from './generated/openapi/types.gen.js';
+import { ProblemException, VALIDATION_ERROR } from './problems.js';
 
 // 모든 예외를 RFC 9457 Problem Details로 바꾼다(openapi/CONVENTIONS.md "에러 응답").
 // 4xx는 detail에 원인을 담고, 5xx는 내부 정보를 숨기고 로그로만 남긴다
@@ -28,9 +29,13 @@ export class ProblemDetailsFilter implements ExceptionFilter {
     if (status < 500 && exception instanceof Error) {
       problem.detail = exception.message;
     }
+    if (exception instanceof ProblemException) {
+      problem.type = exception.problem.type;
+      problem.title = exception.problem.title;
+    }
     if (status === 400 && isValidatorError(exception)) {
-      problem.type = '/problems/validation-error';
-      problem.title = 'Validation Error';
+      problem.type = VALIDATION_ERROR.type;
+      problem.title = VALIDATION_ERROR.title;
       problem.errors = exception.errors.flatMap(({ path, message }): ProblemError[] => {
         const pointer = toPointer(path);
         return pointer ? [{ pointer, detail: message }] : [];

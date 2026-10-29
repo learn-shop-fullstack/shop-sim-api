@@ -4,6 +4,7 @@ import type { HttpAdapterHost } from '@nestjs/core';
 import * as OpenApiValidator from 'express-openapi-validator';
 import { describe, expect, it, vi } from 'vitest';
 import { ProblemDetailsFilter, toPointer } from './problem-details.filter.js';
+import { INVALID_PAGE_TOKEN, ProblemException } from './problems.js';
 
 describe('toPointer', () => {
   it.each([
@@ -36,6 +37,19 @@ describe('ProblemDetailsFilter', () => {
       { type: 'about:blank', title: 'Not Found', status: 404, detail: '상품이 없다', instance: '/products/x' },
       404,
     );
+  });
+
+  it('ProblemException은 그 type·title과 detail을 담는다', () => {
+    const [, body, status] = run(new ProblemException(INVALID_PAGE_TOKEN, '발급 조건과 다르다')).reply.mock
+      .calls[0];
+    expect(body).toEqual({
+      type: '/problems/invalid-page-token',
+      title: 'Invalid Page Token',
+      status: 400,
+      detail: '발급 조건과 다르다',
+      instance: '/products/x',
+    });
+    expect(status).toBe(400);
   });
 
   it('검증기 오류는 그 상태 코드를 쓰고 405면 Allow 헤더를 옮긴다', () => {
