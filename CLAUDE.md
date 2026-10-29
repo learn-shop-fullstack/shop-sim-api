@@ -58,11 +58,12 @@ scripts/
 - TypeScript는 6에 고정한다. 7은 TypeScript를 라이브러리로 쓰는 도구(Nest CLI, tsgolint 등)의 지원을 확인하지 않았다
 - 환경 변수는 `process.env`를 직접 읽지 않고 앱의 `config.ts`(Zod 스키마)를 거친다. 변수는 쓰는 기능이 생길 때 추가하고 `.env.example`에도 적는다
 - 테스트는 소스 옆 `*.spec.ts`이고 Vitest API를 명시적으로 import한다(`globals` 끔)
+- 앱끼리 공유하는 코드(`db/` 등)는 레포 루트에 두고 상대 경로로 import한다. 그래서 두 앱의 `rootDir`이 레포 루트이고, 산출물은 `dist/apps/<앱>/apps/<앱>/src/main.js`처럼 소스 구조를 그대로 따른다. `nest start`는 진입 파일을 알아서 찾는다. 경로 별칭은 Vitest에도 따로 맞춰야 해서 쓰지 않는다 (#30)
 
 ### 로컬 실행
 - 데이터 스택은 `../shop-sim-infra/compose/local`을 띄운다(사용법은 그 README)
 - 처음 받으면 `cp .env.example .env`. 개발 스크립트(`start:*`)는 `--env-file .env`로 읽어서 파일이 없으면 시작하지 않는다
-- 종료 신호를 시험할 때는 `$(mise which node) dist/apps/<앱>/main.js`로 직접 실행한다. `mise exec`는 SIGTERM을 node에 전달하지 않는다. 배포 이미지도 셸 없이 node를 PID 1로 실행한다
+- 종료 신호를 시험할 때는 `$(mise which node) dist/apps/<앱>/apps/<앱>/src/main.js`로 직접 실행한다. `mise exec`는 SIGTERM을 node에 전달하지 않는다. 배포 이미지도 셸 없이 node를 PID 1로 실행한다
 
 ## 기술 결정 (요약)
 
