@@ -1,0 +1,17 @@
+{
+  "name": "@learn-shop-fullstack/shop-sim-api-openapi",
+  "description": "shop-sim HTTP API의 OpenAPI 스펙. redocly bundle로 합친 단일 파일이다",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/learn-shop-fullstack/shop-sim-api.git",
+    "directory": "packages/openapi"
+  },
+  "files": ["openapi.yaml"],
+  "exports": {
+    "./openapi.yaml": "./openapi.yaml"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  }
+}
