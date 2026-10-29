@@ -23,3 +23,7 @@ jobs:
       # 잠금 파일과 package.json이 어긋나면 고치지 않고 실패한다
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
+      # DB 없이 도는 단위 테스트. 라우트 대조 테스트(스펙 paths ↔ 등록 라우트)도 여기 있다
+      - run: pnpm test
+      # tsc 빌더라 생성 타입과 컨트롤러가 어긋나면 여기서 실패한다
+      - run: pnpm build
