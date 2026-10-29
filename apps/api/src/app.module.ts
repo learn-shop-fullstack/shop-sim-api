@@ -2,12 +2,13 @@ import { resolve } from 'node:path';
 import { type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import * as OpenApiValidator from 'express-openapi-validator';
+import { CatalogModule } from './catalog/catalog.module.js';
 import { ConfigModule } from './config.module.js';
 import { HealthController } from './health/health.controller.js';
 import { ProblemDetailsFilter } from './problem-details.filter.js';
 
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule, CatalogModule],
   controllers: [HealthController],
   // APP_FILTER로 등록하면 필터가 DI 컨테이너에서 만들어져 의존성을 주입받는다
   providers: [{ provide: APP_FILTER, useClass: ProblemDetailsFilter }],
