@@ -51,6 +51,11 @@ scripts/
 - 스키마에 컬럼·제약·인덱스 이름을 직접 적는다(`timestamp('expires_at', …)`, `index('payments_status_expires_at_idx')`). 1.0에서 casing API가 바뀌어도 마이그레이션이 흔들리지 않는다
 - 시각은 `timestamp(…, { withTimezone: true })`(`timestamptz`)
 - 트랜잭션 경계는 서비스 계층에서 명시적으로 잡는다. 상태 변경과 아웃박스 기록은 같은 트랜잭션.
+- 스펙이 허용하지 않는 값은 CHECK로 DB에서 먼저 거절한다. 저장된 값이 스펙과 다르면 조회 때 응답 검증이 500으로 막는다 (#30)
+- `uuidv7()` 기본값은 Postgres 18 이상이 필요하다(운영 포함)
+- 커서 페이지네이션은 `apps/api/src/pagination/page-token.ts`를 쓴다. 커서에 담는 시각은 DB 텍스트(`::text`)로 받는다. JS `Date`는 밀리초까지라 같은 밀리초 안의 행이 페이지 경계에서 빠진다 (#30)
+- Drizzle 인덱스의 `.desc()`는 `NULLS LAST`를 붙인다. 기본 `ORDER BY … DESC`(NULLS FIRST)로 읽을 인덱스는 `.desc().nullsFirst()`로 둔다 (#30)
+- DB 연결 모듈은 `apps/api/src/database/`에 있다. `worker`가 DB를 쓰게 되면 레포 루트 `db/`로 옮긴다
 
 ### 코드 (#24)
 - ESM(`"type": "module"`, `nodenext`)이라 상대 import에 `./x.js`처럼 확장자를 붙인다
@@ -58,11 +63,14 @@ scripts/
 - TypeScript는 6에 고정한다. 7은 TypeScript를 라이브러리로 쓰는 도구(Nest CLI, tsgolint 등)의 지원을 확인하지 않았다
 - 환경 변수는 `process.env`를 직접 읽지 않고 앱의 `config.ts`(Zod 스키마)를 거친다. 변수는 쓰는 기능이 생길 때 추가하고 `.env.example`에도 적는다
 - 테스트는 소스 옆 `*.spec.ts`이고 Vitest API를 명시적으로 import한다(`globals` 끔)
+  - `pnpm test`는 DB 없이 도는 단위 테스트, `pnpm test:contract`는 실제 Postgres의 `shop_sim_test`(`TEST_DATABASE_URL`)에 앱을 띄운다. DB가 없으면 계약 테스트는 실패한다(의도). 마이그레이션 적용 기록이 꼬이면 `shop_sim_test`를 지우고 다시 실행한다 (#30)
+- pnpm은 허용 목록에 없는 설치 스크립트가 있으면 설치를 실패시킨다. 새 의존성이 스크립트를 가지면 `pnpm-workspace.yaml`의 `allowBuilds`에 허용(`true`) 또는 거부(`false`)를 명시하고 이유를 적는다 (#30)
+- 앱끼리 공유하는 코드(`db/` 등)는 레포 루트에 두고 상대 경로로 import한다. 그래서 두 앱의 `rootDir`이 레포 루트이고, 산출물은 `dist/apps/<앱>/apps/<앱>/src/main.js`처럼 소스 구조를 그대로 따른다. `nest start`는 진입 파일을 알아서 찾는다. 경로 별칭은 Vitest에도 따로 맞춰야 해서 쓰지 않는다 (#30)
 
 ### 로컬 실행
 - 데이터 스택은 `../shop-sim-infra/compose/local`을 띄운다(사용법은 그 README)
 - 처음 받으면 `cp .env.example .env`. 개발 스크립트(`start:*`)는 `--env-file .env`로 읽어서 파일이 없으면 시작하지 않는다
-- 종료 신호를 시험할 때는 `$(mise which node) dist/apps/<앱>/main.js`로 직접 실행한다. `mise exec`는 SIGTERM을 node에 전달하지 않는다. 배포 이미지도 셸 없이 node를 PID 1로 실행한다
+- 종료 신호를 시험할 때는 `$(mise which node) dist/apps/<앱>/apps/<앱>/src/main.js`로 직접 실행한다. `mise exec`는 SIGTERM을 node에 전달하지 않는다. 배포 이미지도 셸 없이 node를 PID 1로 실행한다
 
 ## 기술 결정 (요약)
 
@@ -80,14 +88,17 @@ scripts/
 | 결제 | `PaymentGateway` 포트 + 토스페이먼츠(테스트) / 모의 PG 어댑터 | 0009 |
 
 ### 스펙 우선 툴체인 (ADR 0012, POC #2)
-- **컴파일 타임**: Hey API `@hey-api/openapi-ts`(`@hey-api/typescript` + `nestjs` 플러그인, 0.x라 정확한 버전 고정). 태그별 `XxxControllerMethods` 타입을 생성하고 컨트롤러가 `implements Pick<...>`로 구현 → 스펙과 어긋나면 빌드 실패
-  - 타입이 잡지 못하는 것: 경로(데코레이터에 따로 적음), 본문이 같은 상태 코드 변경(204↔200은 둘 다 `void`, `@HttpCode`로 맞춘다), `Pick`에 없는 새 operation. **CI에서** 검증기를 켠 계약 테스트와 라우트 대조 테스트(스펙 paths ↔ 등록된 라우트, 양방향)가 잡는다. 운영의 검증기는 발견용이 아니라 스펙과 다른 응답을 막는 마지막 방어선이다 (#28)
+- **컴파일 타임**: Hey API `@hey-api/openapi-ts`(`@hey-api/typescript` + `nestjs` 플러그인, 0.x라 정확한 버전 고정). 태그별 `XxxControllerMethods` 타입을 생성하고 컨트롤러가 구현 → 스펙과 어긋나면 빌드 실패
+  - 태그의 operation을 모두 구현한 컨트롤러는 `implements XxxControllerMethods` 전체로 둔다(스펙에 operation이 추가되면 빌드 실패). 구현하는 중에만 `implements Pick<...>` (#30)
+  - 타입이 잡지 못하는 것: 경로(데코레이터에 따로 적음), 본문이 같은 상태 코드 변경(204↔200은 둘 다 `void`, `@HttpCode`로 맞춘다), `Pick`에 없는 새 operation. **CI에서** 검증기를 켠 계약 테스트(`*.contract.spec.ts`)와 라우트 대조 테스트(`apps/api/src/routes.spec.ts`, 스펙 paths ↔ 등록된 라우트, 양방향)가 잡는다. 운영의 검증기는 발견용이 아니라 스펙과 다른 응답을 막는 마지막 방어선이다 (#28)
+  - 계약 테스트는 응답 검증이 켜져 있다는 전제에 기댄다. 그 전제를 지키는 응답 검증 가드 테스트(`products.contract.spec.ts`)를 유지한다 (#30)
   - 파라미터는 객체 단위(`@Param() path`, `@Query() query`, `@Body() body`)로 받는다
   - 플러그인 문서는 Nest v11만 명시한다. 생성물이 순수 타입이라 Nest 12에서 동작하지만, Nest·플러그인 업그레이드 시 다시 확인한다
   - 생성 입력은 원본이 아니라 `openapi:bundle`이 합친 `dist/openapi/openapi.yaml`이다. 원본을 도메인별 파일로 나눠도 생성·검증·패키지 쪽은 바뀌지 않는다
   - 생성물(`apps/<앱>/src/generated/`)은 커밋하지 않는다. `build`·`start:api`·`lint:code`가 앞에서 `pnpm generate`를 실행한다. 개발 서버가 떠 있는 중에 스펙을 고치면 다시 시작해야 반영된다
 - **런타임 검증**: `express-openapi-validator`를 Nest 미들웨어로 전 경로에 건다. 요청·응답·`format` 검증, 응답 검증은 모든 환경에서 켠다. 실행 시 합친 스펙 `dist/openapi/openapi.yaml`이 필요하다(배포 이미지에 포함)
 - **에러 응답**: 전역 `@Catch()` 필터가 모든 예외를 RFC 9457 `application/problem+json`으로 바꾼다. 4xx는 `detail`에 원인, 5xx는 메시지를 숨기고 로그로만. 이 필터가 없으면 검증기 오류가 전부 500이 된다
+  - 클라이언트가 구분해야 하는 오류는 `apps/api/src/problems.ts`의 상수로 `ProblemException`을 던진다. 상수는 CONVENTIONS "오류 종류 목록"과 1:1이고, 새 type은 표에 먼저 추가한다 (#30)
 - 응답 스키마의 초과 필드는 `additionalProperties: false`가 있어야 잡힌다 → 규약은 #6
 - **문서**: YAML 스펙을 Swagger UI 또는 Scalar로 그대로 서빙
 - 쓰지 않는 것: DTO 클래스 + class-validator로 스키마 이중 정의, `@nestjs/swagger` 코드 우선 생성
@@ -130,4 +141,4 @@ scripts/
 
 ## 현재 단계
 
-1단계(뼈대 배포) 진행 중. 완료: Nest 프로젝트 세팅(#24), `openapi/` 스펙(#26), 생성 파이프라인(#28). 다음: 상품 API 구현(검증기·Problem 필터·DB 연결) + 계약 테스트.
+1단계(뼈대 배포) 진행 중. 완료: Nest 프로젝트 세팅(#24), `openapi/` 스펙(#26), 생성 파이프라인(#28), 상품 API 구현 + 계약 테스트(#30). 다음: CI(린트 → 생성 → 테스트, 계약 테스트용 Postgres 서비스 컨테이너, 스펙 패키지 배포). #30 코멘트의 후속 메모를 해당 항목에서 반영한다.

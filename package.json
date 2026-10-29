@@ -10,19 +10,25 @@
     "generate": "pnpm openapi:bundle && openapi-ts",
     "build": "pnpm generate && nest build api && nest build worker",
     "start:api": "pnpm generate && nest start api --watch --env-file .env",
-    "start:api:prod": "node dist/apps/api/main.js",
+    "start:api:prod": "node dist/apps/api/apps/api/src/main.js",
     "start:worker": "nest start worker --watch --env-file .env",
-    "start:worker:prod": "node dist/apps/worker/main.js",
+    "start:worker:prod": "node dist/apps/worker/apps/worker/src/main.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
     "lint": "pnpm lint:code && pnpm lint:openapi",
-    "lint:code": "pnpm generate && oxlint --type-aware --deny-warnings apps/",
+    "lint:code": "pnpm generate && oxlint --type-aware --deny-warnings apps/ db/ drizzle.config.ts",
     "lint:openapi": "REDOCLY_SUPPRESS_UPDATE_NOTICE=true redocly lint openapi/openapi.yaml",
     "openapi:bundle": "REDOCLY_SUPPRESS_UPDATE_NOTICE=true redocly bundle openapi/openapi.yaml --output dist/openapi/openapi.yaml",
-    "test": "vitest run"
+    "test": "pnpm generate && vitest run --project unit",
+    "test:contract": "pnpm generate && vitest run --project contract"
   },
   "dependencies": {
     "@nestjs/common": "12.3.2",
     "@nestjs/core": "12.3.2",
     "@nestjs/platform-express": "12.3.2",
+    "drizzle-orm": "0.45.4",
+    "express-openapi-validator": "5.6.2",
+    "pg": "8.23.1",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
     "zod": "4.6.7"
@@ -30,12 +36,16 @@
   "devDependencies": {
     "@hey-api/openapi-ts": "0.99.0",
     "@nestjs/cli": "12.0.11",
+    "@nestjs/testing": "12.3.2",
     "@redocly/cli": "2.71.1",
     "@types/node": "26.6.5",
+    "@types/pg": "8.23.1",
+    "drizzle-kit": "0.31.11",
     "oxlint": "1.90.0",
     "oxlint-tsgolint": "7.0.2005",
     "typescript": "6.0.3",
     "vite": "8.3.5",
-    "vitest": "5.0.5"
+    "vitest": "5.0.5",
+    "yaml": "2.9.1"
   }
 }

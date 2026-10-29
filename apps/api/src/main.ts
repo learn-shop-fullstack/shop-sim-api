@@ -1,7 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.js';
-import { loadConfig } from './config.js';
+import type { Config } from './config.js';
+import { CONFIG } from './config.module.js';
 
-const config = loadConfig();
 const app = await NestFactory.create(AppModule);
-await app.listen(config.PORT);
+// SIGTERM·SIGINT를 받으면 HTTP 서버를 닫고 onApplicationShutdown 훅(DB 풀 종료 등)을 실행한다
+app.enableShutdownHooks();
+await app.listen(app.get<Config>(CONFIG).PORT);

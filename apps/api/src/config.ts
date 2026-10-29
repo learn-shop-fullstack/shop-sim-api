@@ -4,6 +4,12 @@ import { z } from 'zod';
 // 변수는 쓰는 기능이 생길 때 추가하고, 같은 이름을 .env.example에도 적는다
 const schema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+  // 기본값을 두지 않는다. 운영에서 빠뜨리면 조용히 localhost에 붙지 않고 시작을 막는다.
+  // 메시지에 입력값(iss.input)을 넣지 않는다. URL에 비밀번호가 들어 있다
+  DATABASE_URL: z.url({
+    protocol: /^postgres(ql)?$/,
+    error: 'postgres:// 또는 postgresql:// URL이어야 한다',
+  }),
 });
 
 export type Config = z.infer<typeof schema>;
