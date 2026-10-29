@@ -1,0 +1,179 @@
+openapi: 3.1.1
+info:
+  title: shop-sim API
+  version: 0.1.0
+  description: 멀티 판매자 마켓플레이스 shop-sim의 HTTP API. 규약은 openapi/CONVENTIONS.md
+servers:
+  # API는 하위 도메인(api.<도메인>)으로 공개하므로 경로 접두어를 두지 않는다.
+  # 호스트는 환경마다 달라서 적지 않는다. 클라이언트는 실행 시점 설정으로 주소를 정한다(ADR 0017)
+  - url: /
+tags:
+  - name: health
+    description: 운영 상태 확인
+  - name: products
+    description: 상품 (catalog 모듈)
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      tags: [health]
+      summary: 프로세스 생존 확인
+      description: |
+        프로세스가 요청을 받을 수 있으면 204를 돌려준다. DB 등 의존 서비스는 확인하지 않는다.
+        compose healthcheck와 배포 에이전트가 쓴다.
+      responses:
+        '204':
+          description: 살아 있음
+  /products:
+    get:
+      operationId: listProducts
+      tags: [products]
+      summary: 공개 상품 목록 (커서)
+      description: 공개(PUBLISHED)된 상품을 최근 공개 순으로 돌려준다. 같은 시각이면 id 역순이다.
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageToken'
+      responses:
+        '200':
+          description: 상품 목록
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+          description: 요청이 스펙과 다름(/problems/validation-error) 또는 pageToken이 잘못됨(/problems/invalid-page-token)
+  /products/{productId}:
+    get:
+      operationId: getProduct
+      tags: [products]
+      summary: 공개 상품 단건 조회
+      description: 공개(PUBLISHED)된 상품만 돌려준다. 공개되지 않은 상품은 없는 상품과 같이 404다.
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 상품
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  parameters:
+    PageSize:
+      name: pageSize
+      in: query
+      description: 한 페이지 최대 개수
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    PageToken:
+      name: pageToken
+      in: query
+      description: 이전 응답의 nextPageToken. 서버가 만든 불투명한 값을 그대로 돌려보낸다
+      schema:
+        type: string
+        minLength: 1
+  responses:
+    BadRequest:
+      description: 요청이 스펙과 다름
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: 리소스가 없음
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    Problem:
+      type: object
+      description: RFC 9457 Problem Details. 클라이언트는 type으로만 분기한다
+      additionalProperties: false
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          description: about:blank 또는 /problems/<kebab-case> (CONVENTIONS.md 오류 종류 목록)
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
+        errors:
+          type: array
+          description: 검증 오류(/problems/validation-error)일 때만
+          items:
+            $ref: '#/components/schemas/ProblemError'
+    ProblemError:
+      type: object
+      additionalProperties: false
+      required: [pointer, detail]
+      properties:
+        pointer:
+          type: string
+          description: 위치 접두어를 둔 JSON Pointer. 예 #/path/productId, #/query/pageSize
+        detail:
+          type: string
+    ProductType:
+      type: string
+      enum: [FINISHED, MADE_TO_ORDER]
+      description: FINISHED 완제품, MADE_TO_ORDER 주문 후 제작
+    Product:
+      type: object
+      additionalProperties: false
+      required: [id, name, subtitle, type, price, discountRate, leadTimeDays]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+        subtitle:
+          type: [string, 'null']
+        type:
+          $ref: '#/components/schemas/ProductType'
+        price:
+          type: integer
+          minimum: 0
+          description: 정가(원). 판매가 계산(할인 끝수 처리)은 3단계에서 정한다
+        discountRate:
+          type: integer
+          minimum: 0
+          maximum: 99
+          description: 할인율(%)
+        leadTimeDays:
+          type: [integer, 'null']
+          minimum: 1
+          description: 제작 소요일. MADE_TO_ORDER일 때만 값이 있다
+    ProductPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextPageToken]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+        nextPageToken:
+          type: [string, 'null']
+          description: 다음 페이지 토큰. 마지막 페이지면 null

@@ -12,7 +12,9 @@
     "start:api:prod": "node dist/apps/api/main.js",
     "start:worker": "nest start worker --watch --env-file .env",
     "start:worker:prod": "node dist/apps/worker/main.js",
-    "lint": "oxlint --type-aware --deny-warnings apps/",
+    "lint": "pnpm lint:code && pnpm lint:openapi",
+    "lint:code": "oxlint --type-aware --deny-warnings apps/",
+    "lint:openapi": "REDOCLY_SUPPRESS_UPDATE_NOTICE=true redocly lint openapi/openapi.yaml",
     "test": "vitest run"
   },
   "dependencies": {
@@ -25,6 +27,7 @@
   },
   "devDependencies": {
     "@nestjs/cli": "12.0.11",
+    "@redocly/cli": "2.71.1",
     "@types/node": "26.6.5",
     "oxlint": "1.90.0",
     "oxlint-tsgolint": "7.0.2005",

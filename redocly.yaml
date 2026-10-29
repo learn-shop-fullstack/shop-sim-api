@@ -2,6 +2,9 @@
 extends:
   - recommended
 
+# 사용 통계를 외부로 보내지 않는다
+telemetry: off
+
 rules:
   # 인증 구현(2단계, ADR 0015)에서 켠다
   security-defined: off
@@ -9,7 +12,10 @@ rules:
   info-license: off
 
   paths-kebab-case: error
-  path-segment-plural: error
+  path-segment-plural:
+    severity: error
+    # 운영용 단일 리소스 경로
+    exceptions: [health]
   no-required-schema-properties-undefined: error
 
   rule/operation-id-camel-case:

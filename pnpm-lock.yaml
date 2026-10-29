@@ -30,6 +30,9 @@ importers:
       '@nestjs/cli':
         specifier: 12.0.11
         version: 12.0.11(@types/node@26.6.5)
+      '@redocly/cli':
+        specifier: 2.71.1
+        version: 2.71.1
       '@types/node':
         specifier: 26.6.5
         version: 26.6.5
@@ -478,6 +481,11 @@ packages:
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [win32]
+
+  '@redocly/cli@2.71.1':
+    resolution: {integrity: sha512-oGJZuFi44K4ehsrPsqeh72k1rVEnqFrFuHPwk8mR0fHenNT6NARrZsPpBvCkNEm71tvBA6JU8ZqRzK/l2bmzkg==}
+    engines: {node: '>=22.12.0 || >=20.19.0 <21.0.0', npm: '>=10'}
+    hasBin: true
 
   '@rolldown/binding-android-arm-eabi@1.2.15':
     resolution: {integrity: sha512-aLcgK9gIJ3YRvrrtfSBbRa27F5WrpiTaPulnFpsHPxpUHgFlSgnU4854MHwoRGEBhfRJDWCS2WQ7lIjskE9Olw==}
@@ -1801,6 +1809,8 @@ snapshots:
 
   '@oxlint/binding-win32-x64-msvc@1.90.0':
     optional: true
+
+  '@redocly/cli@2.71.1': {}
 
   '@rolldown/binding-android-arm-eabi@1.2.15':
     optional: true

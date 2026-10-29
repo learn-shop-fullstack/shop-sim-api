@@ -108,7 +108,7 @@ scripts/
   - SIGTERM에서 `disconnect()`로 그룹을 떠난다. 강제 종료되면 세션 타임아웃까지 리밸런스가 늦어져 그 파티션 처리가 멈춘다
 
 ### 인증 (ADR 0015, POC #17)
-- Better Auth 핸들러는 Nest 밖 Express에 직접 건다: `bodyParser: false` → `/api/auth/*splat`·`/api/admin/auth/*splat` 핸들러 → `express.json()` → 검증기 → Nest 라우트. 세션 조회는 가드에서 `auth.api.getSession({ headers: fromNodeHeaders(req.headers) })`
+- Better Auth 핸들러는 Nest 밖 Express에 직접 건다: `bodyParser: false` → `/auth/*splat`·`/admin/auth/*splat` 핸들러(Better Auth 기본 `basePath`가 `/api/auth`라 직접 지정한다) → `express.json()` → 검증기 → Nest 라우트. 세션 조회는 가드에서 `auth.api.getSession({ headers: fromNodeHeaders(req.headers) })`
 - 인증 경로는 스펙 우선의 예외다. OpenAPI에 넣지 않고 검증기 `ignorePaths`로 뺀다. 이 예외를 다른 경로로 넓히지 않는다
 - core 테이블은 Drizzle로 직접 정의한다(`db/ERD.md` "회원 1"). TS 키는 Better Auth 필드 이름과 같게, `generateId: false`로 id는 DB `uuidv7()`. 업그레이드·플러그인 추가 시 `@better-auth/cli generate` 결과와 비교한다
 - 서버만 쓰는 필드(`isTestAccount` 등)는 `additionalFields`에 `input: false`
@@ -128,4 +128,4 @@ scripts/
 
 ## 현재 단계
 
-1단계(뼈대 배포) 진행 중. 완료: Nest 프로젝트 세팅(#24). 다음: `openapi/` 스펙(헬스체크, 상품 단건/목록) → 스펙 린트·생성 파이프라인.
+1단계(뼈대 배포) 진행 중. 완료: Nest 프로젝트 세팅(#24), `openapi/` 스펙(헬스체크, 상품 단건·목록, #26). 다음: 서버 인터페이스 생성 파이프라인(Hey API) → 구현·계약 테스트.
