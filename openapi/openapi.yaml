@@ -1,0 +1,24 @@
+openapi: 3.1.1
+info:
+  title: shop-sim API
+  version: 0.1.0
+  description: 멀티 판매자 마켓플레이스 shop-sim의 HTTP API. 규약은 openapi/CONVENTIONS.md
+servers:
+  # API는 하위 도메인(api.<도메인>)으로 공개하므로 경로 접두어를 두지 않는다.
+  # 호스트는 환경마다 달라서 적지 않는다. 클라이언트는 실행 시점 설정으로 주소를 정한다(ADR 0017)
+  - url: /
+tags:
+  - name: health
+    description: 운영 상태 확인
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      tags: [health]
+      summary: 프로세스 생존 확인
+      description: |
+        프로세스가 요청을 받을 수 있으면 204를 돌려준다. DB 등 의존 서비스는 확인하지 않는다.
+        compose healthcheck와 배포 에이전트가 쓴다.
+      responses:
+        '204':
+          description: 살아 있음

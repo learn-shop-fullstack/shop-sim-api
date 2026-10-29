@@ -9,7 +9,10 @@ rules:
   info-license: off
 
   paths-kebab-case: error
-  path-segment-plural: error
+  path-segment-plural:
+    severity: error
+    # 운영용 단일 리소스 경로
+    exceptions: [health]
   no-required-schema-properties-undefined: error
 
   rule/operation-id-camel-case:
