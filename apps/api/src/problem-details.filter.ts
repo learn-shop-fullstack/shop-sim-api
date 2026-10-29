@@ -36,7 +36,10 @@ export class ProblemDetailsFilter implements ExceptionFilter {
       });
     }
     if (status >= 500) {
-      this.logger.error(exception instanceof Error ? exception.stack : exception);
+      // 응답 검증 실패는 어긋난 위치(/response/internalCost 등)가 errors에만 있다. 응답에는 숨기고 로그에만 남긴다.
+      // Logger에 두 번째 인자를 주면 문자열에 따라 context로 해석될 수 있어 한 문자열로 합친다
+      const errors = isValidatorError(exception) ? `\nerrors: ${JSON.stringify(exception.errors)}` : '';
+      this.logger.error(exception instanceof Error ? `${exception.stack}${errors}` : exception);
     }
 
     // 405는 허용 메서드를 Allow 헤더로 알려야 한다(RFC 9110). 검증기가 값을 담아 준다

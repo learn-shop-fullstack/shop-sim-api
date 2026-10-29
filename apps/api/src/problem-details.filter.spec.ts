@@ -63,6 +63,19 @@ describe('ProblemDetailsFilter', () => {
     });
   });
 
+  it('검증기 5xx(응답 검증 실패)는 어긋난 위치를 로그에만 남긴다', () => {
+    const logError = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+    const exception = new OpenApiValidator.error.InternalServerError({
+      path: '/response',
+      message: '/response must NOT have additional properties',
+    });
+    exception.errors = [{ path: '/response/internalCost', message: 'must NOT have additional properties' }];
+    const [, body] = run(exception).reply.mock.calls[0];
+    expect(JSON.stringify(body)).not.toContain('internalCost');
+    expect(logError).toHaveBeenCalledWith(expect.stringContaining('/response/internalCost'));
+    logError.mockRestore();
+  });
+
   it.each([new Error('DB 비밀번호 틀림'), 'throw된 문자열', new ServiceUnavailableException('내부 사정')])(
     '5xx는 detail을 숨기고 로그로만 남긴다 (%s)',
     (exception) => {
