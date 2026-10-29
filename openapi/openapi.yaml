@@ -86,18 +86,40 @@ components:
         type: string
         minLength: 1
   responses:
+    # 예시는 목 서버(Prism)가 그대로 돌려준다. 요청 검증에 실패하면 첫 번째 예시를 쓴다
     BadRequest:
       description: 요청이 스펙과 다름
       content:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
+          examples:
+            validationError:
+              summary: 요청 검증 오류
+              value:
+                type: /problems/validation-error
+                title: Validation Error
+                status: 400
+                detail: request/params/productId must match format "uuid"
+                instance: /products/not-a-uuid
+                errors:
+                  - pointer: '#/path/productId'
+                    detail: must match format "uuid"
     NotFound:
       description: 리소스가 없음
       content:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
+          examples:
+            notFound:
+              summary: 리소스 없음
+              value:
+                type: about:blank
+                title: Not Found
+                status: 404
+                detail: 상품을 찾을 수 없다
+                instance: /products/0190a5c3-7b2e-7c4d-9f1a-2b3c4d5e6f70
   schemas:
     Problem:
       type: object

@@ -17,6 +17,8 @@ rules:
     # 운영용 단일 리소스 경로
     exceptions: [health]
   no-required-schema-properties-undefined: error
+  # 목 서버가 예시를 그대로 돌려주므로 스키마와 어긋난 예시는 계약 위반이다(#34)
+  no-invalid-media-type-examples: error
 
   rule/operation-id-camel-case:
     subject: { type: Operation, property: operationId }
