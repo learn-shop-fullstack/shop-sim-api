@@ -3,6 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
+import type { PgInsertValue } from 'drizzle-orm/pg-core';
 import { Pool } from 'pg';
 import { products } from '../../../db/schema/products.js';
 import { AppModule } from '../src/app.module.js';
@@ -43,8 +44,19 @@ export async function resetProducts(): Promise<void> {
   await testDb().execute(sql`TRUNCATE products`);
 }
 
-// 기본값은 공개 완제품이다. 테스트는 바꿀 값만 넘긴다
-export async function insertProduct(overrides: Partial<typeof products.$inferInsert> = {}): Promise<string> {
+// DB가 정한 공개 목록 순서. 정렬 기대값을 테스트에 하드코딩하지 않으려고 같은 DB에 묻는다
+export async function publishedNamesInOrder(): Promise<string[]> {
+  const rows = await testDb()
+    .select({ name: products.name })
+    .from(products)
+    .where(sql`${products.status} = 'PUBLISHED'`)
+    .orderBy(sql`${products.publishedAt} DESC, ${products.id} DESC`);
+  return rows.map((row) => row.name);
+}
+
+// 기본값은 공개 완제품이다. 테스트는 바꿀 값만 넘긴다. PgInsertValue라 값 자리에 sql``을 넣을 수 있다
+// (마이크로초 시각처럼 Date를 거치면 잘리는 값)
+export async function insertProduct(overrides: Partial<PgInsertValue<typeof products>> = {}): Promise<string> {
   const [row] = await testDb()
     .insert(products)
     .values({
