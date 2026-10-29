@@ -40,6 +40,7 @@ scripts/
 
 ### 모듈 경계
 - 모듈 간 호출은 각 모듈의 공개 서비스 인터페이스 또는 이벤트로만 한다. 다른 모듈의 리포지토리·테이블을 직접 읽지 않는다 (lint 규칙으로 강제).
+  - 모듈이 둘 이상 생기면 `.oxlintrc.json`에 `no-restricted-imports`의 `group` 패턴(`["../*/*", "!../*/index.js"]`)으로 건다. `regex`의 lookahead는 지원되지 않고 경고 없이 무시되므로, 규칙을 넣으면 위반 예시로 실패하는지 확인한다 (#24)
 - `worker`는 `api`의 모듈을 재사용하되, HTTP 계층은 쓰지 않는다.
 
 ### 데이터
@@ -51,11 +52,24 @@ scripts/
 - 시각은 `timestamp(…, { withTimezone: true })`(`timestamptz`)
 - 트랜잭션 경계는 서비스 계층에서 명시적으로 잡는다. 상태 변경과 아웃박스 기록은 같은 트랜잭션.
 
+### 코드 (#24)
+- ESM(`"type": "module"`, `nodenext`)이라 상대 import에 `./x.js`처럼 확장자를 붙인다
+- 빌더는 `tsc`다. 모노레포 기본값 rspack은 swc로 변환하고 타입 검사를 별도 플러그인이 있을 때만 해서, 스펙 타입과 어긋나도 빌드가 통과할 수 있다
+- TypeScript는 6에 고정한다. 7은 TypeScript를 라이브러리로 쓰는 도구(Nest CLI, tsgolint 등)의 지원을 확인하지 않았다
+- 환경 변수는 `process.env`를 직접 읽지 않고 앱의 `config.ts`(Zod 스키마)를 거친다. 변수는 쓰는 기능이 생길 때 추가하고 `.env.example`에도 적는다
+- 테스트는 소스 옆 `*.spec.ts`이고 Vitest API를 명시적으로 import한다(`globals` 끔)
+
+### 로컬 실행
+- 데이터 스택은 `../shop-sim-infra/compose/local`을 띄운다(사용법은 그 README)
+- 처음 받으면 `cp .env.example .env`. 개발 스크립트(`start:*`)는 `--env-file .env`로 읽어서 파일이 없으면 시작하지 않는다
+- 종료 신호를 시험할 때는 `$(mise which node) dist/apps/<앱>/main.js`로 직접 실행한다. `mise exec`는 SIGTERM을 node에 전달하지 않는다. 배포 이미지도 셸 없이 node를 PID 1로 실행한다
+
 ## 기술 결정 (요약)
 
 | 영역 | 결정 | ADR |
 |---|---|---|
 | 프레임워크 | NestJS 12, 모듈러 모놀리스 | 0002, 0012 |
+| 런타임·도구 | Node 26 LTS, ESM, Nest CLI 모노레포(`tsc` 빌더), Zod(설정 검증), oxlint(type-aware), Vitest | — |
 | 계약 | OpenAPI 3.1 + AsyncAPI 스펙 우선, semver 패키지 배포 | 0003, 0012 |
 | 이벤트 | Kafka + 아웃박스, 재시도 토픽 + DLT, 지연 처리는 DB 스윕. 봉투는 CloudEvents 1.0 binary 모드 | 0004, 0016 |
 | ORM | Drizzle + drizzle-kit (0.45 안정판, 1.0 정식 출시 시 업그레이드 경로 확인) | 0005 |
@@ -85,6 +99,7 @@ scripts/
 ### Kafka
 - 클라이언트: `@confluentinc/kafka-javascript`를 Nest 모듈로 직접 감싼다 (연결 수명주기, 그레이스풀 셧다운, 오프셋 수동 커밋)
   - librdkafka 네이티브 바이너리를 설치 스크립트가 받는다 → `pnpm-workspace.yaml`의 `allowBuilds`에 이 패키지만 허용. 배포 이미지의 Node 메이저·libc가 릴리스의 사전 빌드 목록에 있어야 한다 (POC #4)
+  - 1.11.0에는 Node 26(ABI 147) 사전 빌드가 없다. 설치가 소스 빌드로 넘어가며 Mac에서 약 6분 걸렸다. 3단계 착수 때 사전 빌드를 다시 확인하고, 없으면 Docker 빌드 단계에 컴파일 도구를 넣는 비용을 재서 정한다 (#24)
 - 토픽: `product.events`, `order.events`, `payment.events`, `shipment.events` 등. 키는 집계 ID(`productId`, `orderId`)
   - 자동 생성에 맡기지 않고 파티션 수를 정해 명시적으로 만든다
 - 컨슈머는 그룹별 `processed_messages`로 멱등 처리, 처리 완료 후 오프셋 커밋
@@ -113,4 +128,4 @@ scripts/
 
 ## 현재 단계
 
-0단계: 주요 결정·스펙 툴체인(ADR 0012)·스펙 규약(ADR 0013)·Drizzle·Kafka·Better Auth POC(ADR 0015)·ERD 초안(`db/ERD.md`)·이벤트 계약 규약(`asyncapi/CONVENTIONS.md`) 완료 → 토스페이먼츠 테스트 키 발급 → 1단계(뼈대 배포).
+1단계(뼈대 배포) 진행 중. 완료: Nest 프로젝트 세팅(#24). 다음: `openapi/` 스펙(헬스체크, 상품 단건/목록) → 스펙 린트·생성 파이프라인.
