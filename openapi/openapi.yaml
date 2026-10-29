@@ -24,6 +24,25 @@ paths:
       responses:
         '204':
           description: 살아 있음
+  /products:
+    get:
+      operationId: listProducts
+      tags: [products]
+      summary: 공개 상품 목록 (커서)
+      description: 공개(PUBLISHED)된 상품을 최근 공개 순으로 돌려준다. 같은 시각이면 id 역순이다.
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageToken'
+      responses:
+        '200':
+          description: 상품 목록
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+          description: 요청이 스펙과 다름(/problems/validation-error) 또는 pageToken이 잘못됨(/problems/invalid-page-token)
   /products/{productId}:
     get:
       operationId: getProduct
@@ -49,6 +68,23 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 components:
+  parameters:
+    PageSize:
+      name: pageSize
+      in: query
+      description: 한 페이지 최대 개수
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    PageToken:
+      name: pageToken
+      in: query
+      description: 이전 응답의 nextPageToken. 서버가 만든 불투명한 값을 그대로 돌려보낸다
+      schema:
+        type: string
+        minLength: 1
   responses:
     BadRequest:
       description: 요청이 스펙과 다름
@@ -129,3 +165,15 @@ components:
           type: [integer, 'null']
           minimum: 1
           description: 제작 소요일. MADE_TO_ORDER일 때만 값이 있다
+    ProductPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextPageToken]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+        nextPageToken:
+          type: [string, 'null']
+          description: 다음 페이지 토큰. 마지막 페이지면 null
