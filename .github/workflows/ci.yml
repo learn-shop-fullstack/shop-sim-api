@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# 기본 GITHUB_TOKEN 권한을 읽기로 줄인다. 쓰기가 필요한 job만 따로 연다
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      # 액션은 태그가 아니라 커밋 SHA로 고정한다(태그는 옮길 수 있다). 주석의 버전은 사람이 읽는 용도
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # 토큰을 .git/config에 남기지 않는다. 이후 단계에서 git push가 필요 없다
+          persist-credentials: false
+      # mise.toml의 Node·pnpm을 설치하고 PATH에 올린다. 버전의 출처는 mise.toml 하나다
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      # 잠금 파일과 package.json이 어긋나면 고치지 않고 실패한다
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
