@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { products } from '../../../../db/schema/products.js';
 import { DB, type Db } from '../database/database.module.js';
 import type { Product } from '../generated/openapi/types.gen.js';
@@ -28,4 +28,25 @@ export class ProductsRepository {
       .where(and(eq(products.id, id), eq(products.status, 'PUBLISHED')));
     return row;
   }
+
+  // 공개 상품을 최근 공개 순(같은 시각이면 id 역순)으로. after가 있으면 그 행 다음부터(키셋).
+  // 행 값 비교라 products_published_at_id_idx를 그 위치부터 읽는다
+  async listPublished(limit: number, after?: ProductCursor): Promise<{ product: Product; cursor: ProductCursor }[]> {
+    const rows = await this.db
+      // JS Date는 밀리초까지라 마이크로초가 잘린다. 커서 시각은 DB 텍스트 그대로 받아 그대로 비교한다
+      .select({ ...productColumns, cursorAt: sql<string>`${products.publishedAt}::text` })
+      .from(products)
+      .where(
+        and(
+          eq(products.status, 'PUBLISHED'),
+          after && sql`(${products.publishedAt}, ${products.id}) < (${after.at}::timestamptz, ${after.id}::uuid)`,
+        ),
+      )
+      .orderBy(desc(products.publishedAt), desc(products.id))
+      .limit(limit);
+    return rows.map(({ cursorAt, ...product }) => ({ product, cursor: { at: cursorAt, id: product.id } }));
+  }
 }
+
+// 목록에서 마지막으로 본 행의 정렬 키. 페이지 토큰에 담긴다
+export type ProductCursor = { at: string; id: string };
